@@ -25,11 +25,18 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     log.info("aegis.startup", env=settings.app_env, version=settings.app_version)
 
-    # In development: auto-create tables
-    if settings.app_env == "development":
+    # Auto-create tables if missing.
+    # SQLAlchemy `create_all` is idempotent (uses IF NOT EXISTS), so this is
+    # safe to run on every startup. For schema migrations on existing tables
+    # use Alembic — this only handles bootstrapping a fresh database.
+    try:
         from app.database import create_tables
         await create_tables()
-        log.info("aegis.db.tables_created")
+        log.info("aegis.db.tables_ready")
+    except Exception as e:
+        log.error("aegis.db.tables_failed", error=str(e))
+        if settings.app_env != "production":
+            raise
 
     yield
 
