@@ -1,0 +1,255 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* ── Topbar ──────────────────────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg1);
+  flex-shrink: 0;
+  gap: 16px;
+  z-index: 100;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+  color: var(--text);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.logoMark {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.companyPill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text2);
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--border2);
+  margin-right: auto;
+}
+
+.companyDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+  flex-shrink: 0;
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.themeToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r);
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.themeToggle:hover {
+  color: var(--text);
+  background: var(--bg3);
+  border-color: var(--accent);
+}
+
+.liveBadge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--teal2);
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: rgba(78, 128, 106, 0.14);
+  border: 1px solid rgba(78, 128, 106, 0.28);
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.sidebar {
+  width: 210px;
+  flex-shrink: 0;
+  background: var(--bg1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 10px 0;
+  overflow-y: auto;
+}
+
+.navSection {
+  flex: 1;
+  padding: 0 8px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--r);
+  color: var(--text2);
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.12s;
+  border: 1px solid transparent;
+  background: none;
+  text-align: left;
+}
+
+.navItem:hover {
+  background: var(--bg2);
+  color: var(--text);
+}
+
+.navItemActive {
+  background: rgba(123, 109, 170, 0.16) !important;
+  color: var(--accent2) !important;
+  border-color: rgba(123, 109, 170, 0.28) !important;
+}
+
+.navIcon {
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.navItemActive .navIcon {
+  opacity: 1;
+}
+
+.navLabel {
+  flex: 1;
+}
+
+.navBadge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: rgba(179, 79, 66, 0.2);
+  color: #cc7060;
+}
+
+.navBadgeBlue {
+  background: rgba(77, 110, 158, 0.22);
+  color: #7898c8;
+}
+
+.sidebarBottom {
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+.sidebarDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+}
+
+/* ── Main ────────────────────────────────────────────────────────────────── */
+.main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Toasts ──────────────────────────────────────────────────────────────── */
+.toastStack {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 999;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--bg1);
+  border: 1px solid var(--border2);
+  border-radius: var(--r2);
+  padding: 11px 14px;
+  max-width: 300px;
+  pointer-events: all;
+  animation: toast-in 0.25s ease;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.toastDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.toastDot-success { background: var(--teal); }
+.toastDot-error   { background: var(--red); }
+.toastDot-warning { background: var(--amber); }
+.toastDot-info    { background: var(--accent2); }
+
+.toastTitle { font-size: 12px; font-weight: 500; color: var(--text); }
+.toastBody  { font-size: 11px; color: var(--text2); margin-top: 2px; line-height: 1.4; }
+
+.toastClose {
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--text3);
+  background: none;
+  border: none;
+  font-family: var(--font);
+  flex-shrink: 0;
+  line-height: 1;
+  margin-left: auto;
+}

@@ -1,0 +1,100 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: aegis-db
+    environment:
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+      POSTGRES_DB: aegis
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: aegis-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aegis-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aegis:aegis@db:5432/aegis
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      APP_ENV: development
+      DEBUG: "true"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aegis-worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aegis:aegis@db:5432/aegis
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.tasks.celery_app worker --loglevel=info --concurrency=2
+
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aegis-beat
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aegis:aegis@db:5432/aegis
+      CELERY_BROKER_URL: redis://redis:6379/1
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    command: celery -A app.workers.tasks.celery_app beat --loglevel=info
+
+  flower:
+    image: mher/flower:2.0
+    container_name: aegis-flower
+    ports:
+      - "5555:5555"
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/1
+    depends_on:
+      - redis
+
+volumes:
+  pgdata:
+  redisdata:

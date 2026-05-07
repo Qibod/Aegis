@@ -1,0 +1,113 @@
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Design tokens — Zen / Japanese palette ─────────────────────────────────── */
+:root {
+  /* Backgrounds — sumi ink, warm not cold */
+  --bg:        #0d0c0a;
+  --bg1:       #131210;
+  --bg2:       #1a1815;
+  --bg3:       #221f1a;
+
+  /* Borders — washi paper grain */
+  --border:    rgba(218,206,190,0.08);
+  --border2:   rgba(218,206,190,0.15);
+
+  /* Text — aged washi paper tones */
+  --text:      #e4dcd0;
+  --text2:     #867d72;
+  --text3:     #504a42;
+
+  /* Accent — fuji (wisteria) */
+  --accent:    #7b6daa;
+  --accent2:   #9d8ec8;
+
+  /* Semantic — traditional Japanese pigments */
+  --teal:      #4e806a;   /* matcha / pine green  */
+  --teal2:     #6a9e84;   /* lighter matcha        */
+  --red:       #b34f42;   /* bengara / torii red   */
+  --amber:     #b87c3a;   /* kaki / persimmon      */
+  --blue:      #4d6e9e;   /* ai-iro / indigo       */
+
+  /* Geometry — clean, restrained */
+  --r:         5px;
+  --r2:        9px;
+  --r3:        13px;
+
+  /* Typography */
+  --font:      'Zen Kaku Gothic New', sans-serif;
+  --mono:      'DM Mono', monospace;
+}
+
+/* ── Light mode — washi paper / hinoki aesthetic ────────────────────────────── */
+[data-theme="light"] {
+  /* Backgrounds — warm rice paper layers */
+  --bg:        #f0ebe0;
+  --bg1:       #e8e2d6;
+  --bg2:       #dfd8ca;
+  --bg3:       #d5cdbf;
+
+  /* Borders — sumi ink on paper */
+  --border:    rgba(70,55,38,0.10);
+  --border2:   rgba(70,55,38,0.19);
+
+  /* Text — sumi ink, warm not black */
+  --text:      #1c1814;
+  --text2:     #65594e;
+  --text3:     #9e9288;
+
+  /* Accent — deeper fuji for contrast on light */
+  --accent:    #6255a0;
+  --accent2:   #7d6fba;
+
+  /* Semantic — richer pigments for light readability */
+  --teal:      #376858;   /* matcha deeper */
+  --teal2:     #4a8470;
+  --red:       #9e3a2c;   /* bengara deeper */
+  --amber:     #9a6220;   /* kaki deeper    */
+  --blue:      #3a5e92;   /* ai-iro deeper  */
+}
+
+/* ── Theme transition — smooth ink wash ─────────────────────────────────────── */
+*, *::before, *::after {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease;
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+html, body, #root {
+  height: 100%;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* ── Scrollbars ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── Typography ────────────────────────────────────────────────────────────── */
+h1 { font-size: 24px; font-weight: 300; letter-spacing: -0.5px; }
+h2 { font-size: 18px; font-weight: 400; letter-spacing: -0.3px; }
+h3 { font-size: 15px; font-weight: 500; }
+
+/* ── Animations ────────────────────────────────────────────────────────────── */
+@keyframes fadeIn      { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideIn     { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideInLeft { from { opacity: 0; transform: translateX(-16px); background: rgba(78,128,106,.12); } to { opacity: 1; transform: translateX(0); background: transparent; } }
+@keyframes pulse       { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes spin        { to { transform: rotate(360deg); } }
+@keyframes toast-in    { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+.animate-fade   { animation: fadeIn 0.25s ease both; }
+.animate-slide  { animation: slideIn 0.2s ease both; }
+.animate-pulse  { animation: pulse 2s infinite; }
+.animate-spin   { animation: spin 0.8s linear infinite; }
+
+/* ── Utilities ─────────────────────────────────────────────────────────────── */
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-only  { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
