@@ -16,10 +16,23 @@ from app.config import get_settings
 
 settings = get_settings()
 
+
+def _normalise_db_url(url: str) -> str:
+    """
+    Railway and most managed Postgres providers give a `postgresql://` URL.
+    SQLAlchemy's async engine needs the asyncpg driver, so we coerce the
+    scheme. Idempotent — leaves an already-correct URL alone.
+    """
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://") and "+asyncpg" not in url:
+        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+    return url
+
+
 # ── Engine ────────────────────────────────────────────────────────────────────
-# NullPool used for tests; production uses connection pooling
 engine = create_async_engine(
-    settings.database_url,
+    _normalise_db_url(settings.database_url),
     echo=settings.debug,
     pool_size=settings.database_pool_size,
     max_overflow=settings.database_max_overflow,
