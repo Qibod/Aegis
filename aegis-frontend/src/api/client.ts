@@ -191,6 +191,8 @@ export const radarApi = {
   list: (params?: { category?: string; severity?: string; page?: number }) =>
     api.get<SignalListResponse>('/radar/signals', { params }).then(r => r.data),
 
+  get: (id: string) => api.get<Signal>(`/radar/signals/${id}`).then(r => r.data),
+
   dismiss: (id: string) => api.post(`/radar/signals/${id}/dismiss`),
 }
 

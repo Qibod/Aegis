@@ -101,7 +101,8 @@ h3 { font-size: 15px; font-weight: 500; }
 @keyframes slideInLeft { from { opacity: 0; transform: translateX(-16px); background: rgba(78,128,106,.12); } to { opacity: 1; transform: translateX(0); background: transparent; } }
 @keyframes pulse       { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 @keyframes spin        { to { transform: rotate(360deg); } }
-@keyframes toast-in    { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes toast-in      { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideInRight  { from { opacity: 0; transform: translateX(32px); } to { opacity: 1; transform: translateX(0); } }
 
 .animate-fade   { animation: fadeIn 0.25s ease both; }
 .animate-slide  { animation: slideIn 0.2s ease both; }
