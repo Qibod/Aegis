@@ -513,7 +513,7 @@ export const TerrainPage: React.FC = () => {
         background: 'var(--bg1)', gap: 12,
       }}>
         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', letterSpacing: '-0.2px', marginRight: 4 }}>
-          Risk terrain — Meridian Financial
+          Risk terrain — Uber Technologies
         </div>
 
         {/* Overlay toggles */}

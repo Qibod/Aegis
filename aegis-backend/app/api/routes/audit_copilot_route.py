@@ -9,7 +9,7 @@ Capabilities:
   Interview prep   — AI generates risk-mapped questions per finding
   Free query       — Open-ended engagement data analysis
 
-Auto-seeds one demo engagement (Meridian FY2024 Revenue Audit) on first request.
+Auto-seeds one demo engagement (Uber Technologies FY2024 Revenue Audit) on first request.
 """
 
 from __future__ import annotations
@@ -47,20 +47,20 @@ router = APIRouter(prefix="/audit-copilot", tags=["audit-copilot"])
 # ─────────────────────────────────────────────────────────────────────────────
 
 _WORK_PAPERS = [
-    {"code": "WP-REV-01", "title": "Revenue Recognition — Planning Memo",         "area": "Revenue",  "status": WorkPaperStatus.approved,  "sort_order": 0},
-    {"code": "WP-REV-02", "title": "Revenue by Product Line — Analytical Review",  "area": "Revenue",  "status": WorkPaperStatus.approved,  "sort_order": 1},
-    {"code": "WP-REV-03", "title": "Journal Entry Testing — Q3-Q4 FY2024",        "area": "Revenue",  "status": WorkPaperStatus.in_review, "sort_order": 2},
-    {"code": "WP-REV-04", "title": "Revenue Recognition — Substantive Testing",   "area": "Revenue",  "status": WorkPaperStatus.draft,     "sort_order": 3, "is_active": True},
-    {"code": "WP-AML-01", "title": "AML Controls Effectiveness Testing",          "area": "AML",      "status": WorkPaperStatus.approved,  "sort_order": 4},
-    {"code": "WP-CTRL-01", "title": "IT General Controls — Access & Change Mgmt", "area": "IT",       "status": WorkPaperStatus.in_review, "sort_order": 5},
-    {"code": "WP-MGMT-01", "title": "Management Representation Letter",            "area": "Reporting","status": WorkPaperStatus.draft,     "sort_order": 6},
+    {"code": "WP-REV-01", "title": "Revenue Recognition — Planning Memo",              "area": "Revenue",   "status": WorkPaperStatus.approved,  "sort_order": 0},
+    {"code": "WP-REV-02", "title": "Mobility & Delivery Take Rate — Analytical Review","area": "Revenue",   "status": WorkPaperStatus.approved,  "sort_order": 1},
+    {"code": "WP-REV-03", "title": "Journal Entry Testing — Q3-Q4 FY2024",             "area": "Revenue",   "status": WorkPaperStatus.in_review, "sort_order": 2},
+    {"code": "WP-REV-04", "title": "Revenue Recognition — Substantive Testing",        "area": "Revenue",   "status": WorkPaperStatus.draft,     "sort_order": 3, "is_active": True},
+    {"code": "WP-FRD-01", "title": "Payment Fraud & Promo Abuse Controls Testing",     "area": "Fraud",     "status": WorkPaperStatus.approved,  "sort_order": 4},
+    {"code": "WP-CTRL-01", "title": "IT General Controls — Access & Change Mgmt",      "area": "IT",        "status": WorkPaperStatus.in_review, "sort_order": 5},
+    {"code": "WP-MGMT-01", "title": "Management Representation Letter",                 "area": "Reporting", "status": WorkPaperStatus.draft,     "sort_order": 6},
 ]
 
 _SECTIONS = [
     {"title": "Objective & scope",  "status": WPSectionStatus.approved,
-     "content": "To obtain sufficient appropriate evidence that revenue is recognised in accordance with IFRS 15 for the period January – December 2024. Scope includes all revenue streams exceeding EUR 500k individually, covering the retail deposits, institutional FX, and trade finance lines."},
+     "content": "To obtain sufficient appropriate evidence that Uber Technologies recognises revenue in accordance with ASC 606 for the period January – December 2024. Scope includes all revenue streams exceeding $50M individually: Mobility (ride-hailing commission / service fee), Delivery (Eats take rate and delivery fee), and Freight (brokerage margin). Excludes driver incentive contra-revenue, which is covered in WP-REV-02."},
     {"title": "Risk assessment",    "status": WPSectionStatus.approved,
-     "content": "Inherent risk is assessed as high. Key risks identified: cut-off manipulation at period end, fictitious transactions through related-party channels, and revenue inflation via early recognition of multi-period contracts. Control risk is moderate — TM controls are in place but model validation is overdue."},
+     "content": "Inherent risk is assessed as high. Key risks: (1) Cut-off manipulation — Mobility trips initiated near period end may span two reporting periods; (2) Take-rate accuracy — changes to commission algorithms in Q3 created risk of misstatement in Eats revenue; (3) Freight revenue netting — gross vs net presentation of carrier payments requires assessment under ASC 606 principal/agent guidance. Control risk is moderate — automated billing reconciliation is in place but the Q3 algorithm change was not subject to financial close review."},
     {"title": "Anomaly findings",   "status": WPSectionStatus.empty,    "content": None},
     {"title": "Evidence & testing", "status": WPSectionStatus.empty,    "content": None},
     {"title": "Conclusions",        "status": WPSectionStatus.empty,    "content": None},
@@ -69,69 +69,69 @@ _SECTIONS = [
 
 _ANOMALIES = [
     {
-        "title": "$2.1M revenue spike in November",
-        "description": "Statistical outlier: November 2024 retail revenue is 34% above the trailing 6-month average. Three large transactions totalling €2.1M were booked on Nov 28-29 — the final two business days of the month. Journal entries were posted by a single operator (ID: FIN-0047) and reversed in the first week of December.",
+        "title": "$47M Eats take-rate spike — Q3 algorithm change",
+        "description": "Uber Eats gross take rate increased from 22.4% to 26.1% in Q3 2024 following an undocumented pricing algorithm update deployed on July 14. The change was not reviewed by Finance before deployment. Revenue for Q3 is $47M higher than the extrapolated run-rate from H1. Three markets (CA, NY, TX) account for 71% of the variance. Journal entries reflect the higher take rate but no supporting change-control documentation was found in the evidence vault.",
         "severity": AnomalySeverity.high,
-        "amount_label": "$2.1M",
-        "account_ref": "GL-7000 · Retail Revenue",
-        "period": "Q3-Q4 FY2024",
-        "assertion": "cutoff",
+        "amount_label": "$47M",
+        "account_ref": "GL-4200 · Delivery Revenue",
+        "period": "Q3 FY2024",
+        "assertion": "accuracy",
     },
     {
-        "title": "Unauthorised journal entry reversal — Dec 29",
-        "description": "A journal entry reversal of €840k was posted on December 29 at 23:47 local time, outside normal business hours. The approver field contains the same user ID as the preparer (FIN-0047), indicating a segregation of duties breach. No supporting documentation found in the evidence vault.",
+        "title": "Unauthorised journal entry — Freight revenue reclassification, Dec 28",
+        "description": "A manual journal entry reclassifying $18.4M of Freight gross bookings from net (brokerage fee) to gross (carrier payment + margin) presentation was posted on December 28 at 22:13 local time, outside normal business hours. The preparer and approver field contain the same user ID (FIN-1134), indicating a segregation of duties breach. Reclassification inflates reported revenue by $14.2M net of carrier costs. No ASC 606 principal/agent memo was found to support gross presentation.",
         "severity": AnomalySeverity.high,
-        "amount_label": "€840k",
-        "account_ref": "GL-7000 · GL-4510",
+        "amount_label": "$14.2M",
+        "account_ref": "GL-4400 · Freight Revenue",
         "period": "Q4 FY2024",
         "assertion": "authorization",
     },
     {
-        "title": "180-day payment terms — non-standard contracts",
-        "description": "Eight contracts with payment terms of 180+ days represent €3.4M of revenue recognised in H2 FY2024. Standard terms are 30-60 days. Contracts lack approval signatures from the Head of Credit. Revenue recognition at contract inception may not be appropriate where collectability is uncertain.",
+        "title": "Driver incentive contra-revenue under-accrual — Q4",
+        "description": "Driver earnings guarantees and surge bonuses paid in Q4 total $312M per payroll records, versus $267M accrued as contra-revenue in the general ledger — a $45M shortfall. Under ASC 606, payments to platform participants (drivers) that create a material right should reduce transaction price. The under-accrual overstates net revenue. Finance management attributes the gap to a forecasting model error identified post-close.",
         "severity": AnomalySeverity.medium,
-        "amount_label": "€3.4M",
-        "account_ref": "GL-7200 · Contract Revenue",
-        "period": "H2 FY2024",
-        "assertion": "occurrence",
-    },
-    {
-        "title": "Q4 accrual spike — top-side entries",
-        "description": "Management top-side accruals in Q4 total €1.2M, representing 180% of the Q3 accrual balance. Accruals were posted on December 31 without underlying contracts or delivery evidence. The pattern is inconsistent with Q1-Q3 accrual behaviour and warrants substantive testing.",
-        "severity": AnomalySeverity.medium,
-        "amount_label": "€1.2M",
-        "account_ref": "GL-2300 · Accrued Revenue",
+        "amount_label": "$45M",
+        "account_ref": "GL-4010 · Driver Incentives (contra-revenue)",
         "period": "Q4 FY2024",
         "assertion": "completeness",
+    },
+    {
+        "title": "Promo code abuse — $8.3M in fraudulent new-user credits",
+        "description": "Data analytics identified 214,000 new-user promo redemptions in FY2024 that share device fingerprints with existing accounts, indicating synthetic-identity abuse. Associated promotional credits of $8.3M were recorded as sales and marketing expense rather than contra-revenue. Misclassification has no P&L impact but overstates gross revenue and marketing spend, affecting segment KPIs presented to the Board.",
+        "severity": AnomalySeverity.medium,
+        "amount_label": "$8.3M",
+        "account_ref": "GL-6100 · Sales & Marketing / GL-4000 · Gross Revenue",
+        "period": "H1-H2 FY2024",
+        "assertion": "classification",
     },
 ]
 
 _INTERVIEW_QUESTIONS = [
     # Controller questions (WP-REV-04)
-    {"question": "Can you walk me through the revenue recognition process for orders booked in November?", "risk_level": "high",   "assertion": "cutoff",         "target_role": "Controller"},
-    {"question": "What triggered the journal entry reversal on December 29 — who approved it?",          "risk_level": "high",   "assertion": "authorization",  "target_role": "Controller"},
-    {"question": "Are 180-day payment terms standard policy, or individually negotiated?",               "risk_level": "medium", "assertion": "occurrence",     "target_role": "Controller"},
-    {"question": "Who has access to post top-side journal entries after the system cut-off?",            "risk_level": "high",   "assertion": "authorization",  "target_role": "Controller"},
-    {"question": "How does the finance team determine when multi-period contracts are fully earned?",     "risk_level": "high",   "assertion": "cutoff",         "target_role": "Controller"},
-    {"question": "What controls exist to prevent revenue being recognised before goods are delivered?",   "risk_level": "medium", "assertion": "occurrence",     "target_role": "Controller"},
+    {"question": "Can you walk us through the July 14 algorithm change — what approval process was followed before deployment?", "risk_level": "high",   "assertion": "accuracy",       "target_role": "Controller"},
+    {"question": "Who authorised the December 28 Freight revenue reclassification, and where is the ASC 606 principal/agent memo?", "risk_level": "high", "assertion": "authorization", "target_role": "Controller"},
+    {"question": "How does Finance verify that driver incentive accruals match payroll actuals at each quarter-end?",            "risk_level": "high",   "assertion": "completeness",   "target_role": "Controller"},
+    {"question": "What controls exist to prevent a single user from both preparing and approving a manual journal entry?",        "risk_level": "high",   "assertion": "authorization",  "target_role": "Controller"},
+    {"question": "How are after-hours journal entries flagged for management review before the books are closed?",                "risk_level": "high",   "assertion": "authorization",  "target_role": "Controller"},
+    {"question": "What is the threshold for Finance sign-off on product or pricing algorithm changes that affect revenue?",       "risk_level": "medium", "assertion": "accuracy",       "target_role": "Controller"},
     # CFO questions
-    {"question": "Can you explain the rationale for the November revenue uplift compared to prior months?", "risk_level": "high",   "assertion": "cutoff",       "target_role": "CFO"},
-    {"question": "Were the board or audit committee informed of the December reversal at the time?",        "risk_level": "high",   "assertion": "authorization", "target_role": "CFO"},
-    # IT Manager questions
-    {"question": "What system controls prevent a single user from both preparing and approving a JE?",   "risk_level": "high",   "assertion": "authorization",  "target_role": "IT Manager"},
-    {"question": "Are after-hours journal entry postings flagged automatically for management review?",   "risk_level": "medium", "assertion": "authorization",  "target_role": "IT Manager"},
-    {"question": "What is the audit trail retention period for GL posting activity?",                    "risk_level": "medium", "assertion": "completeness",   "target_role": "IT Manager"},
-    {"question": "Can the system restrict posting to authorised users only during period-end close?",    "risk_level": "medium", "assertion": "authorization",  "target_role": "IT Manager"},
+    {"question": "Were the Audit Committee or Board informed of the Q3 take-rate variance when it was first identified?",        "risk_level": "high",   "assertion": "accuracy",       "target_role": "CFO"},
+    {"question": "What is management's position on the Freight gross vs net presentation, and has outside counsel reviewed it?", "risk_level": "high",   "assertion": "authorization",  "target_role": "CFO"},
+    # VP Engineering / IT
+    {"question": "Does the pricing algorithm deployment pipeline include a mandatory Finance review gate before production release?", "risk_level": "high",   "assertion": "accuracy",      "target_role": "VP Engineering"},
+    {"question": "What audit trail is retained for algorithm parameter changes — version history, approval records, rollback logs?",  "risk_level": "medium", "assertion": "completeness",  "target_role": "VP Engineering"},
+    {"question": "How does the system enforce segregation of duties for ERP journal entry posting and approval?",                     "risk_level": "high",   "assertion": "authorization", "target_role": "VP Engineering"},
+    {"question": "Can the ERP restrict manual journal entries to authorised users only during the period-end close window?",          "risk_level": "medium", "assertion": "authorization", "target_role": "VP Engineering"},
 ]
 
 
 async def _seed_engagement(org_id: UUID, db: AsyncSession) -> AuditEngagement:
-    """Create the demo Meridian FY2024 Revenue Audit engagement."""
+    """Create the demo Uber Technologies FY2024 Revenue Audit engagement."""
     eng = AuditEngagement(
         org_id=org_id,
         name="FY2024 Revenue Audit",
         phase="Phase 2",
-        client_name="Meridian Group",
+        client_name="Uber Technologies, Inc.",
         period="FY2024",
         status=EngagementStatus.active,
     )

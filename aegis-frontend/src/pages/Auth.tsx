@@ -113,9 +113,9 @@ export const RegisterPage: React.FC = () => {
         <h1 style={{ fontSize: 22, fontWeight: 300, letterSpacing: -0.4, marginBottom: 6 }}>Create account</h1>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 28 }}>Set up your GRC environment</p>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Input label="Organisation name" value={form.org_name} onChange={set('org_name')} placeholder="Meridian Financial Services" required />
+          <Input label="Organisation name" value={form.org_name} onChange={set('org_name')} placeholder="Uber Technologies, Inc." required />
           <Input label="Your name" value={form.full_name} onChange={set('full_name')} placeholder="Vijay Rao" required />
-          <Input label="Email" type="email" value={form.email} onChange={set('email')} placeholder="vijay@meridian.com" required />
+          <Input label="Email" type="email" value={form.email} onChange={set('email')} placeholder="vijay@uber.com" required />
           <Input label="Password" type="password" value={form.password} onChange={set('password')} placeholder="••••••••" required />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Role</label>

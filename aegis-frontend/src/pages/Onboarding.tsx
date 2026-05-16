@@ -122,7 +122,7 @@ const StepIdentify: React.FC<{
           label="Company name"
           value={name}
           onChange={e => setName(e.target.value)}
-          placeholder="e.g. Meridian Financial Services"
+          placeholder="e.g. Uber Technologies, Inc."
           required
           disabled={loading}
         />
