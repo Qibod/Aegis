@@ -103,6 +103,8 @@ export const authApi = {
 export const orgsApi = {
   me: () => api.get<Organization>('/orgs/me').then(r => r.data),
 
+  profile: () => api.get<Organization & { fingerprint_data: FingerprintResponse }>('/orgs/profile').then(r => r.data),
+
   fingerprint: (companyName: string) =>
     api.post<FingerprintResponse>('/orgs/fingerprint', { company_name: companyName }).then(r => r.data),
 

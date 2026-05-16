@@ -14,6 +14,7 @@ import { RegulatoryAgentPage } from '@/pages/RegulatoryAgent'
 import { AuditReportPage } from '@/pages/AuditReport'
 import { TerrainPage } from '@/pages/Terrain'
 import { AuditCopilotPage } from '@/pages/AuditCopilot'
+import { CompanyProfilePage } from '@/pages/CompanyProfile'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,7 +56,8 @@ export default function App() {
           <Route path="/regulatory"    element={<Protected><RegulatoryAgentPage /></Protected>} />
           <Route path="/audit/reports/:reportId" element={<Protected><AuditReportPage /></Protected>} />
           <Route path="/terrain" element={<Protected><TerrainPage /></Protected>} />
-          <Route path="/audit-copilot" element={<Protected><AuditCopilotPage /></Protected>} />
+          <Route path="/audit-copilot"     element={<Protected><AuditCopilotPage /></Protected>} />
+          <Route path="/company-profile"  element={<Protected><CompanyProfilePage /></Protected>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

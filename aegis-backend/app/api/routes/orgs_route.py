@@ -11,7 +11,7 @@ from app.database import get_db
 from app.models import Organization, User
 from app.schemas import (
     OrgCompleteOnboarding, OrgFingerprintRequest,
-    OrgFingerprintResponse, OrgResponse,
+    OrgFingerprintResponse, OrgResponse, OrgProfileResponse,
 )
 
 router = APIRouter(prefix="/orgs", tags=["organizations"])
@@ -19,6 +19,17 @@ router = APIRouter(prefix="/orgs", tags=["organizations"])
 
 @router.get("/me", response_model=OrgResponse)
 async def get_my_org(
+    org_id: Annotated[UUID, Depends(get_org_id)],
+    db: AsyncSession = Depends(get_db),
+):
+    org = (await db.execute(select(Organization).where(Organization.id == org_id))).scalar_one_or_none()
+    if not org:
+        raise HTTPException(404, "Organization not found")
+    return org
+
+
+@router.get("/profile", response_model=OrgProfileResponse)
+async def get_org_profile(
     org_id: Annotated[UUID, Depends(get_org_id)],
     db: AsyncSession = Depends(get_db),
 ):

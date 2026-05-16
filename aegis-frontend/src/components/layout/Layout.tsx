@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, AlertTriangle, Shield, GitBranch,
   Calendar, Radio, Activity, Settings, LogOut, Clock, BookOpen, Layers, Bot,
-  Sun, Moon,
+  Sun, Moon, Building2,
 } from 'lucide-react'
 import { useAuthStore, useUIStore } from '@/store'
 import { Avatar, LiveDot } from '@/components/ui'
@@ -33,6 +33,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard',  label: 'Dashboard',      icon: <LayoutDashboard size={15} />, path: '/' },
+  { id: 'company-profile', label: 'Company Profile', icon: <Building2 size={15} />, path: '/company-profile' },
   { id: 'radar',      label: 'Risk Radar',      icon: <Radio size={15} />,           path: '/radar',   badge: 'Live', badgeVariant: 'blue' },
   { id: 'risks',      label: 'Risk Register',   icon: <AlertTriangle size={15} />,   path: '/risks' },
   { id: 'terrain',    label: 'Risk Terrain',    icon: <Layers size={15} />,          path: '/terrain', badge: 'New', badgeVariant: 'blue' },

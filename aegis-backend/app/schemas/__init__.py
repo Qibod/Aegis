@@ -77,6 +77,18 @@ class OrgResponse(AegisBase):
     created_at: datetime
 
 
+class OrgProfileResponse(AegisBase):
+    id: UUID
+    name: str
+    slug: str
+    industry_label: str | None
+    jurisdiction: str | None
+    regulator: str | None
+    onboarding_complete: bool
+    created_at: datetime
+    fingerprint_data: dict[str, Any] = {}
+
+
 class OrgCompleteOnboarding(BaseModel):
     """Final onboarding step — user confirms fingerprint and selects frameworks."""
     fingerprint_data: dict[str, Any]
