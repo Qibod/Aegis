@@ -1,7 +1,7 @@
 """app/api/routes/radar_route.py"""
 from typing import Annotated
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, update
@@ -9,10 +9,140 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_org_id
 from app.database import get_db
-from app.models import Signal, SignalSeverity
+from app.models import Signal, SignalSeverity, SignalCategory
 from app.schemas import SignalListResponse, SignalResponse
 
 router = APIRouter(prefix="/radar", tags=["radar"])
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Curated multi-category signal catalogue
+# Auto-seeded on first request so the Radar shows the full spectrum of risk
+# signals — not just external regulations. Source "Aegis Radar" marks these so
+# the seed is idempotent (won't duplicate, won't re-run once present).
+# ─────────────────────────────────────────────────────────────────────────────
+
+_CRIT = SignalSeverity.critical
+_HIGH = SignalSeverity.high
+_MED  = SignalSeverity.medium
+_INFO = SignalSeverity.info
+
+_REG  = SignalCategory.regulatory
+_THR  = SignalCategory.threat
+_VEN  = SignalCategory.vendor
+_MAC  = SignalCategory.macro
+
+# (category, severity, source, title, body, ai_recommendation, tags, days_ago)
+_RADAR_CATALOG = [
+    # ── Threat intelligence ────────────────────────────────────────────────
+    (_THR, _CRIT, "MITRE / CISA",
+     "Akira ransomware actively exploiting SSL-VPN appliances in financial sector",
+     "CISA and sector ISACs report an active Akira ransomware campaign exploiting unpatched SSL-VPN appliances (CVE-2024-40766). Multiple mid-size financial institutions have been hit with double-extortion since the start of the month.",
+     "Confirm SSL-VPN appliances are patched to the fixed firmware. Force-rotate VPN credentials, enable MFA on all remote access, and validate that immutable backups are tested and offline.",
+     ["ransomware", "cyber", "cve", "vpn"], 2),
+    (_THR, _HIGH, "Aegis Threat Intelligence",
+     "Credential-stuffing campaign targeting retail banking login portals",
+     "Automated credential-stuffing traffic against retail banking authentication endpoints has risen sharply across the sector, using breach-compilation password lists. Account-takeover attempts are bypassing weak rate-limiting.",
+     "Review WAF rate-limiting and bot-management rules on the auth tier. Enforce step-up authentication on anomalous logins and monitor for impossible-travel patterns.",
+     ["account-takeover", "fraud", "cyber"], 4),
+    (_THR, _HIGH, "NVD",
+     "High-severity zero-day in managed file-transfer software (active exploitation)",
+     "A pre-authentication remote code execution vulnerability in a widely deployed managed file-transfer product is being actively exploited for data theft. Financial services are a primary target given regulatory data volumes.",
+     "Inventory MFT exposure across the estate. Apply the emergency patch or take the service offline; hunt for indicators of compromise in transfer logs over the last 30 days.",
+     ["zero-day", "cve", "data-exfiltration"], 6),
+    (_THR, _MED, "Aegis Threat Intelligence",
+     "Phishing kit impersonating regulator correspondence in circulation",
+     "A phishing kit spoofing supervisory-authority correspondence (enforcement notice lures) is circulating. Targets are compliance and finance staff, with credential-harvesting landing pages.",
+     "Brief compliance and finance teams. Add the campaign indicators to mail-filtering and run a targeted simulated-phishing exercise for those functions.",
+     ["phishing", "social-engineering"], 9),
+
+    # ── Third-party / vendor risk ──────────────────────────────────────────
+    (_VEN, _CRIT, "Vendor Monitor",
+     "KYC / identity-verification provider reporting major service degradation",
+     "A critical KYC/identity-verification provider in the onboarding pipeline is reporting sustained service degradation. Customer onboarding and remediation screening are partially blocked, creating a regulatory SLA risk.",
+     "Activate the manual KYC fallback runbook. Notify the MLRO of potential onboarding backlog and document the incident for the third-party risk register and regulator if SLA thresholds are breached.",
+     ["third-party", "kyc", "outage", "concentration"], 1),
+    (_VEN, _HIGH, "Vendor Monitor",
+     "Core banking vendor announces sub-processor change — DPA review required",
+     "The core banking platform vendor has notified a new sub-processor for analytics processing, effective in 30 days. This triggers a contractual data-processing-agreement and GDPR Article 28 review obligation.",
+     "Have Legal and the DPO review the updated sub-processor list against the DPA. Assess data-residency and onward-transfer implications before the effective date; object in writing if controls are insufficient.",
+     ["third-party", "gdpr", "dpa", "outsourcing"], 5),
+    (_VEN, _HIGH, "Vendor Monitor",
+     "Cloud region outage impacting payment-processing availability",
+     "The primary cloud region hosting payment-processing workloads experienced a multi-hour availability incident. RTO for the payment gateway approached the DORA tolerable-disruption threshold.",
+     "Run a post-incident review against the operational-resilience impact-tolerance statement. Validate multi-region failover and update the DORA important-business-service mapping.",
+     ["third-party", "resilience", "dora", "outage"], 8),
+    (_VEN, _MED, "Vendor Monitor",
+     "Critical SaaS vendor SOC 2 report lapsed — assurance gap",
+     "The annual SOC 2 Type II report for a critical SaaS vendor has lapsed and the bridge letter has not been provided. There is currently no independent assurance over that vendor's control environment.",
+     "Request the bridge letter and renewal timeline from the vendor. Escalate to the third-party risk committee if assurance is not restored within the contractual window.",
+     ["third-party", "assurance", "soc2"], 12),
+
+    # ── Macro / geopolitical / sector ──────────────────────────────────────
+    (_MAC, _HIGH, "Macro Watch",
+     "Central bank signals further rate tightening — IRRBB exposure",
+     "Forward guidance points to continued policy-rate tightening. Interest-rate risk in the banking book and ALM repricing assumptions should be re-tested against a steeper-for-longer scenario.",
+     "Re-run IRRBB stress scenarios with the updated rate path. Brief ALCO on EVE/NII sensitivity and review hedge effectiveness and deposit-beta assumptions.",
+     ["macro", "interest-rate", "alm", "irrbb"], 3),
+    (_MAC, _HIGH, "Macro Watch",
+     "Expanded sanctions package against additional financial entities",
+     "A new sanctions package adds financial entities and changes ownership-aggregation rules. Screening lists and 50%-rule logic must be updated to avoid false-negative exposure.",
+     "Confirm the screening provider has ingested the updated lists. Re-run a retrospective screen over recent high-value payments and document results for the sanctions control file.",
+     ["macro", "sanctions", "screening"], 7),
+    (_MAC, _MED, "Macro Watch",
+     "Sector-wide deposit-outflow trend observed in regional banking",
+     "Industry data shows an accelerating deposit-outflow trend in the regional banking segment, with funding mix shifting toward higher-cost wholesale sources. Liquidity-coverage assumptions warrant review.",
+     "Stress liquidity (LCR/NSFR) under an adverse deposit-runoff scenario and review the contingency funding plan with treasury.",
+     ["macro", "liquidity", "funding"], 11),
+    (_MAC, _MED, "Macro Watch",
+     "FX volatility spike — treasury and hedging review",
+     "EUR/USD realised volatility has spiked on macro uncertainty. Open FX positions and the effectiveness of existing hedges should be reviewed against revised value-at-risk limits.",
+     "Review FX VaR utilisation and hedge coverage with treasury; confirm limit framework remains appropriate under the elevated volatility regime.",
+     ["macro", "fx", "market-risk"], 14),
+
+    # ── Regulatory (curated headline set) ──────────────────────────────────
+    (_REG, _CRIT, "Regulatory Monitor",
+     "DORA in force — ICT resilience obligations now enforceable",
+     "The Digital Operational Resilience Act is now enforceable. ICT risk-management, incident-classification, third-party-register and threat-led-penetration-testing obligations are subject to supervisory examination.",
+     "Confirm the DORA gap-assessment remediation roadmap is on track. Prioritise the ICT third-party register and incident-classification procedures for the next supervisory cycle.",
+     ["regulatory", "dora", "resilience"], 2),
+    (_REG, _HIGH, "Regulatory Monitor",
+     "EBA publishes final guidelines on outsourcing arrangements",
+     "Updated guidelines tighten expectations on critical-or-important function identification, exit strategies and sub-outsourcing oversight, with documentation expected at the next examination.",
+     "Map current outsourcing register to the updated criteria. Verify exit strategies and sub-outsourcing clauses exist for all critical-or-important arrangements.",
+     ["regulatory", "outsourcing", "eba"], 6),
+    (_REG, _HIGH, "Regulatory Monitor",
+     "AMLD6 — expanded predicate offences and individual liability",
+     "The sixth Anti-Money-Laundering Directive expands predicate offences and introduces individual liability for senior management, raising the bar for transaction-monitoring coverage and governance evidence.",
+     "Reassess transaction-monitoring scenario coverage against the expanded predicate-offence list and confirm senior-management governance and training evidence is current.",
+     ["regulatory", "aml", "amld6"], 10),
+    (_REG, _MED, "Regulatory Monitor",
+     "EU AI Act — high-risk obligations for credit-scoring models",
+     "Credit-scoring and creditworthiness models are classified high-risk under the EU AI Act, triggering data-governance, transparency, human-oversight and conformity-assessment obligations.",
+     "Inventory ML models used in credit decisioning. Begin a conformity-assessment gap analysis covering data governance, bias testing and human-oversight controls.",
+     ["regulatory", "ai-act", "model-risk"], 15),
+]
+
+
+async def _seed_radar_signals(org_id: UUID, db: AsyncSession) -> None:
+    """Idempotently seed the curated multi-category signal catalogue."""
+    now = datetime.now(timezone.utc)
+    for i, (cat, sev, source, title, body, rec, tags, days_ago) in enumerate(_RADAR_CATALOG):
+        db.add(Signal(
+            org_id=org_id,
+            source=source,
+            category=cat,
+            severity=sev,
+            title=title,
+            body=body,
+            ai_recommendation=rec,
+            tags=tags,
+            relevance_score=0.92 if sev in (_CRIT, _HIGH) else 0.78,
+            is_surfaced=True,
+            is_new=True,
+            published_at=now - timedelta(days=days_ago),
+            external_id=f"radar-cat-{i}",
+        ))
+    await db.commit()
 
 
 @router.get("/signals", response_model=SignalListResponse)
@@ -24,6 +154,16 @@ async def list_signals(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
+    # Auto-seed the curated multi-category catalogue once per org.
+    has_catalog = (await db.execute(
+        select(Signal.id).where(
+            Signal.org_id == org_id,
+            Signal.external_id.like("radar-cat-%"),
+        ).limit(1)
+    )).scalar_one_or_none()
+    if has_catalog is None:
+        await _seed_radar_signals(org_id, db)
+
     q = (
         select(Signal)
         .where(Signal.org_id == org_id, Signal.is_surfaced == True, Signal.dismissed_at.is_(None))
@@ -48,6 +188,12 @@ async def list_signals(
         "medium": sum(1 for s in all_signals if s.severity == SignalSeverity.medium),
         "info": sum(1 for s in all_signals if s.severity == SignalSeverity.info),
         "new_today": sum(1 for s in all_signals if s.created_at and s.created_at >= today_start),
+        # Per-category counts power the Radar category navigation
+        "all": len(all_signals),
+        "cat_regulatory": sum(1 for s in all_signals if s.category == SignalCategory.regulatory),
+        "cat_threat": sum(1 for s in all_signals if s.category == SignalCategory.threat),
+        "cat_vendor": sum(1 for s in all_signals if s.category == SignalCategory.vendor),
+        "cat_macro": sum(1 for s in all_signals if s.category == SignalCategory.macro),
     }
 
     new_ids = [s.id for s in items if s.is_new]

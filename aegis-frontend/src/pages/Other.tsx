@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { Radio, Scale, ShieldAlert, Network, Globe } from 'lucide-react'
 import { radarApi, pulseApi, auditApi, controlsApi, auditReportApi } from '@/api/client'
 import { Button, SeverityChip, StatusChip, Chip, EmptyState, Spinner, ProgressBar, LiveDot, Input } from '@/components/ui'
 import type { Signal, PulseControl, AuditPlan, AuditTask, Control } from '@/types'
@@ -22,9 +23,16 @@ export const RadarPage: React.FC = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['signals'] }),
   })
 
-  const CATS = ['', 'regulatory', 'threat', 'vendor', 'macro']
-  const CAT_LABELS: Record<string, string> = { '': 'All', regulatory: 'Regulatory', threat: 'Threat intel', vendor: 'Vendor', macro: 'Macro' }
   const SEV_COLORS: Record<string, string> = { critical: 'var(--red)', high: 'var(--amber)', medium: 'var(--blue)', info: 'var(--teal)' }
+
+  const CATEGORIES = [
+    { key: '',           label: 'All signals', icon: Radio,       desc: 'Every risk signal',                 countKey: 'all' as const },
+    { key: 'regulatory', label: 'Regulatory',  icon: Scale,       desc: 'Rules, enforcement & guidance',     countKey: 'cat_regulatory' as const },
+    { key: 'threat',     label: 'Threat intel',icon: ShieldAlert, desc: 'Cyber threats, CVEs & campaigns',   countKey: 'cat_threat' as const },
+    { key: 'vendor',     label: 'Third-party', icon: Network,     desc: 'Vendor & supply-chain risk',        countKey: 'cat_vendor' as const },
+    { key: 'macro',      label: 'Macro',       icon: Globe,       desc: 'Geopolitical, economic & sector',   countKey: 'cat_macro' as const },
+  ]
+  const c = data?.counts
 
   return (
     <div className="page animate-fade">
@@ -33,33 +41,58 @@ export const RadarPage: React.FC = () => {
           <div className="page-title">Risk Radar</div>
           <div className="page-sub">{data?.total ?? 0} signals · refreshes every 15s</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <LiveDot />
-          <span style={{ fontSize: 12, color: 'var(--teal2)', fontWeight: 500 }}>Live</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {c && (
+            <div style={{ display: 'flex', gap: 12 }}>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}><b style={{ color: 'var(--red)' }}>{c.critical}</b> critical</span>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}><b style={{ color: 'var(--amber)' }}>{c.high}</b> high</span>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}><b style={{ color: 'var(--accent2)' }}>{c.new_today}</b> new today</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <LiveDot />
+            <span style={{ fontSize: 12, color: 'var(--teal2)', fontWeight: 500 }}>Live</span>
+          </div>
         </div>
       </div>
 
-      {data && (
-        <div style={{ display: 'flex', gap: 12, padding: '10px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-          {[{label:'Critical',v:'critical'},{label:'High',v:'high'},{label:'New today',v:''}].map(s => (
-            <div key={s.label} style={{ fontSize: 12, color: 'var(--text2)' }}>
-              <span style={{ fontWeight: 500, color: s.v === 'critical' ? 'var(--red)' : s.v === 'high' ? 'var(--amber)' : 'var(--accent2)', marginRight: 4 }}>
-                {s.v === 'critical' ? data.counts.critical : s.v === 'high' ? data.counts.high : data.counts.new_today}
-              </span>{s.label}
-            </div>
-          ))}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 5 }}>
-            {CATS.map(c => (
-              <button key={c} onClick={() => setCatFilter(c)}
-                style={{ fontSize: 11, fontWeight: 500, padding: '3px 10px', borderRadius: 99, cursor: 'pointer', fontFamily: 'var(--font)', border: '1px solid', transition: 'all .12s',
-                  background: catFilter === c ? 'rgba(108,99,255,.2)' : 'none',
-                  borderColor: catFilter === c ? 'rgba(108,99,255,.4)' : 'var(--border2)',
-                  color: catFilter === c ? 'var(--accent2)' : 'var(--text2)',
-                }}>{CAT_LABELS[c]}</button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Category navigation ──────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 8, padding: '12px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto' }}>
+        {CATEGORIES.map(cat => {
+          const active = catFilter === cat.key
+          const Icon = cat.icon
+          const count = c?.[cat.countKey] ?? 0
+          return (
+            <button key={cat.key || 'all'} onClick={() => setCatFilter(cat.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: 'var(--r2)',
+                cursor: 'pointer', fontFamily: 'var(--font)', textAlign: 'left', transition: 'all .14s',
+                border: '1px solid',
+                background: active ? 'rgba(123,109,170,.14)' : 'var(--bg1)',
+                borderColor: active ? 'rgba(123,109,170,.45)' : 'var(--border)',
+                flexShrink: 0,
+              }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: active ? 'rgba(123,109,170,.20)' : 'var(--bg3)', flexShrink: 0,
+              }}>
+                <Icon size={15} color={active ? 'var(--accent2)' : 'var(--text2)'} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: active ? 'var(--accent2)' : 'var(--text)' }}>{cat.label}</span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 99, minWidth: 18, textAlign: 'center',
+                    background: active ? 'rgba(123,109,170,.25)' : 'var(--bg3)',
+                    color: active ? 'var(--accent2)' : 'var(--text3)',
+                  }}>{count}</span>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>{cat.desc}</div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1.6, overflowY: 'auto', borderRight: '1px solid var(--border)' }}>

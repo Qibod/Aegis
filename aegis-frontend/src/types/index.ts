@@ -237,6 +237,11 @@ export interface SignalListResponse {
     medium: number
     info: number
     new_today: number
+    all?: number
+    cat_regulatory?: number
+    cat_threat?: number
+    cat_vendor?: number
+    cat_macro?: number
   }
 }
 
