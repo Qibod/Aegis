@@ -13,6 +13,8 @@ import type {
   RegulatoryChange, RegulatoryChangeListResponse, RegulatoryDeadline, RegChangeTask,
   AuditReport, FindingResponse,
   AuditEngagement, CopilotChatResponse, WPSection, InterviewQuestion, CopilotMode,
+  FullProfile, OrgIdentity, LOB, OrgGeo, OrgIndustry, OrgProduct,
+  CustomerSegment, ThirdParty, DataTech, ChangeLogEntry, PropagationPreview,
 } from '@/types'
 
 // ── Axios instance ────────────────────────────────────────────────────────────
@@ -113,6 +115,52 @@ export const orgsApi = {
     selected_frameworks: string[]
     risk_domains: string[]
   }) => api.post<Organization>('/orgs/complete-onboarding', data).then(r => r.data),
+}
+
+// ── Company Profile ───────────────────────────────────────────────────────────
+export const profileApi = {
+  get:            () => api.get<FullProfile>('/profile').then(r => r.data),
+
+  createIdentity: (d: Partial<OrgIdentity>) => api.post<OrgIdentity>('/profile/identity', d).then(r => r.data),
+  updateIdentity: (d: Partial<OrgIdentity>) => api.patch<OrgIdentity>('/profile/identity', d).then(r => r.data),
+
+  listLobs:    () => api.get<LOB[]>('/profile/lines-of-business').then(r => r.data),
+  createLob:   (d: Partial<LOB>) => api.post<LOB>('/profile/lines-of-business', d).then(r => r.data),
+  updateLob:   (id: string, d: Partial<LOB>) => api.patch<LOB>(`/profile/lines-of-business/${id}`, d).then(r => r.data),
+  archiveLob:  (id: string) => api.delete(`/profile/lines-of-business/${id}`),
+
+  listGeos:    () => api.get<OrgGeo[]>('/profile/geographies').then(r => r.data),
+  createGeo:   (d: Partial<OrgGeo>) => api.post<OrgGeo>('/profile/geographies', d).then(r => r.data),
+  deleteGeo:   (id: string) => api.delete(`/profile/geographies/${id}`),
+
+  listIndustries:   () => api.get<OrgIndustry[]>('/profile/industries').then(r => r.data),
+  createIndustry:   (d: Partial<OrgIndustry>) => api.post<OrgIndustry>('/profile/industries', d).then(r => r.data),
+  deleteIndustry:   (id: string) => api.delete(`/profile/industries/${id}`),
+
+  listProducts:  () => api.get<OrgProduct[]>('/profile/products').then(r => r.data),
+  createProduct: (d: Partial<OrgProduct>) => api.post<OrgProduct>('/profile/products', d).then(r => r.data),
+  updateProduct: (id: string, d: Partial<OrgProduct>) => api.patch<OrgProduct>(`/profile/products/${id}`, d).then(r => r.data),
+  deleteProduct: (id: string) => api.delete(`/profile/products/${id}`),
+
+  listSegments:   () => api.get<CustomerSegment[]>('/profile/customer-segments').then(r => r.data),
+  createSegment:  (d: Partial<CustomerSegment>) => api.post<CustomerSegment>('/profile/customer-segments', d).then(r => r.data),
+  deleteSegment:  (id: string) => api.delete(`/profile/customer-segments/${id}`),
+
+  listThirdParties:   () => api.get<ThirdParty[]>('/profile/third-parties').then(r => r.data),
+  createThirdParty:   (d: Partial<ThirdParty>) => api.post<ThirdParty>('/profile/third-parties', d).then(r => r.data),
+  updateThirdParty:   (id: string, d: Partial<ThirdParty>) => api.patch<ThirdParty>(`/profile/third-parties/${id}`, d).then(r => r.data),
+  deleteThirdParty:   (id: string) => api.delete(`/profile/third-parties/${id}`),
+
+  getDataTech:    () => api.get<DataTech | null>('/profile/data-tech').then(r => r.data),
+  updateDataTech: (d: Partial<DataTech>) => api.patch<DataTech>('/profile/data-tech', d).then(r => r.data),
+
+  getChangeLog:   (page = 1) => api.get<{ items: ChangeLogEntry[]; total: number; page: number; page_size: number }>(`/profile/change-log?page=${page}`).then(r => r.data),
+  getPropagation: (id: string) => api.get<PropagationPreview>(`/profile/propagate/${id}`).then(r => r.data),
+  applyPropagation: (change_log_id: string, approved_modules: string[]) =>
+    api.post('/profile/propagate/apply', { change_log_id, approved_modules }).then(r => r.data),
+
+  // kept for backward compat — legacy fingerprint display
+  legacyProfile: () => api.get<Organization & { fingerprint_data: FingerprintResponse }>('/orgs/profile').then(r => r.data),
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────

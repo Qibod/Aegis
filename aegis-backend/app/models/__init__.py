@@ -918,3 +918,163 @@ class InterviewQuestion(Base):
     sort_order  = Column(Integer, default=0)
 
     work_paper = relationship("CopilotWorkPaper", back_populates="questions")
+
+
+# ── COMPANY PROFILE ───────────────────────────────────────────────────────────
+
+class OrgProfile(Base):
+    """Canonical company identity — one per org."""
+    __tablename__ = "org_profiles"
+
+    id                   = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id               = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, unique=True)
+    legal_name           = Column(String(255), nullable=False)
+    trading_name         = Column(String(255))
+    year_founded         = Column(Integer)
+    employee_range       = Column(String(50))
+    annual_revenue_range = Column(String(50))
+    hq_country           = Column(String(2))
+    hq_city              = Column(String(100))
+    stock_ticker         = Column(String(20))
+    website              = Column(String(500))
+    description          = Column(String(500))
+    logo_url             = Column(String(500))
+    updated_by           = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+
+    __table_args__ = (Index("ix_org_profiles_org_id", "org_id"),)
+
+
+class LineOfBusiness(Base):
+    __tablename__ = "lines_of_business"
+
+    id                       = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id                   = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    name                     = Column(String(255), nullable=False)
+    description              = Column(Text)
+    status                   = Column(String(20), nullable=False, default="active")
+    launch_date              = Column(String(10))
+    revenue_contribution_pct = Column(Integer)
+    is_primary               = Column(Boolean, default=False)
+
+    __table_args__ = (Index("ix_lob_org_id", "org_id"),)
+
+
+class OrgGeography(Base):
+    __tablename__ = "org_geographies"
+
+    id               = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id           = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    country          = Column(String(2), nullable=False)
+    region           = Column(String(50))
+    state_province   = Column(String(100))
+    presence_type    = Column(String(30), nullable=False, default="operational")
+    lob_ids          = Column(JSON, default=list)
+    regulatory_flags = Column(JSON, default=list)
+
+    __table_args__ = (Index("ix_geo_org_id", "org_id"),)
+
+
+class OrgIndustry(Base):
+    __tablename__ = "org_industries"
+
+    id             = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id         = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    code           = Column(String(20), nullable=False)
+    name           = Column(String(255), nullable=False)
+    classification = Column(String(20), nullable=False, default="secondary")
+    lob_ids        = Column(JSON, default=list)
+
+    __table_args__ = (Index("ix_industry_org_id", "org_id"),)
+
+
+class OrgProduct(Base):
+    __tablename__ = "org_products"
+
+    id                   = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id               = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    name                 = Column(String(255), nullable=False)
+    description          = Column(Text)
+    product_type         = Column(String(30), nullable=False, default="product")
+    lob_id               = Column(UUID(as_uuid=True))
+    geography_ids        = Column(JSON, default=list)
+    customer_segment_ids = Column(JSON, default=list)
+    status               = Column(String(20), nullable=False, default="live")
+    launch_date          = Column(String(10))
+    data_sensitivity     = Column(String(20), nullable=False, default="low")
+
+    __table_args__ = (Index("ix_products_org_id", "org_id"),)
+
+
+class CustomerSegment(Base):
+    __tablename__ = "org_customer_segments"
+
+    id                  = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id              = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    name                = Column(String(255), nullable=False)
+    segment_type        = Column(String(20), nullable=False, default="b2b")
+    includes_minors     = Column(Boolean, default=False)
+    includes_healthcare = Column(Boolean, default=False)
+    includes_financial  = Column(Boolean, default=False)
+    geography_ids       = Column(JSON, default=list)
+    lob_ids             = Column(JSON, default=list)
+    estimated_size      = Column(String(100))
+
+    __table_args__ = (Index("ix_segments_org_id", "org_id"),)
+
+
+class ThirdPartyDependency(Base):
+    __tablename__ = "org_third_parties"
+
+    id                = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id            = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    name              = Column(String(255), nullable=False)
+    category          = Column(String(40), nullable=False, default="saas_vendor")
+    tier              = Column(String(10), nullable=False, default="tier_2")
+    geography_ids     = Column(JSON, default=list)
+    sub_processors    = Column(JSON, default=list)
+    last_assessed     = Column(String(10))
+    assessment_status = Column(String(20), nullable=False, default="not_assessed")
+
+    __table_args__ = (Index("ix_third_parties_org_id", "org_id"),)
+
+
+class DataTechProfile(Base):
+    __tablename__ = "org_data_tech_profiles"
+
+    id                              = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id                          = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, unique=True)
+    uses_ai_ml                      = Column(Boolean, default=False)
+    ai_use_cases                    = Column(JSON, default=list)
+    cloud_providers                 = Column(JSON, default=list)
+    data_residency_requirements     = Column(JSON, default=list)
+    handles_personal_data           = Column(Boolean, default=False)
+    handles_sensitive_personal_data = Column(Boolean, default=False)
+    handles_payment_data            = Column(Boolean, default=False)
+    handles_health_data             = Column(Boolean, default=False)
+    handles_classified_data         = Column(Boolean, default=False)
+    core_tech_stack                 = Column(JSON, default=list)
+
+    __table_args__ = (Index("ix_data_tech_org_id", "org_id"),)
+
+
+class ProfileChangeLog(Base):
+    __tablename__ = "profile_change_logs"
+
+    id                 = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id             = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    changed_by         = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    changed_at         = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    entity_type        = Column(String(50), nullable=False)
+    entity_id          = Column(UUID(as_uuid=True))
+    field_changed      = Column(String(100))
+    old_value          = Column(JSON)
+    new_value          = Column(JSON)
+    change_summary     = Column(Text)
+    propagation_status = Column(String(20), default="pending")
+    affected_modules   = Column(JSON, default=list)
+    propagation_result = Column(JSON, default=dict)
+
+    __table_args__ = (
+        Index("ix_change_log_org_id", "org_id"),
+        Index("ix_change_log_changed_at", "org_id", "changed_at"),
+    )

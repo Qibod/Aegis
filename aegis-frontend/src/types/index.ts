@@ -589,3 +589,82 @@ export interface AuditReport {
   created_at: string
   finding_responses: FindingResponse[]
 }
+
+// ── Company Profile ───────────────────────────────────────────────────────────
+
+export interface OrgIdentity {
+  id: string; org_id: string; legal_name: string; trading_name: string | null
+  year_founded: number | null; employee_range: string | null; annual_revenue_range: string | null
+  hq_country: string | null; hq_city: string | null; stock_ticker: string | null
+  website: string | null; description: string | null; logo_url: string | null
+  updated_by: string | null; created_at: string; updated_at: string
+}
+
+export interface LOB {
+  id: string; org_id: string; name: string; description: string | null
+  status: 'active' | 'planned' | 'archived'; launch_date: string | null
+  revenue_contribution_pct: number | null; is_primary: boolean; created_at: string; updated_at: string
+}
+
+export interface OrgGeo {
+  id: string; org_id: string; country: string; region: string | null
+  state_province: string | null; presence_type: string
+  lob_ids: string[]; regulatory_flags: string[]; created_at: string
+}
+
+export interface OrgIndustry {
+  id: string; org_id: string; code: string; name: string
+  classification: 'primary' | 'secondary'; lob_ids: string[]; created_at: string
+}
+
+export interface OrgProduct {
+  id: string; org_id: string; name: string; description: string | null
+  product_type: string; lob_id: string | null; geography_ids: string[]
+  customer_segment_ids: string[]; status: string; launch_date: string | null
+  data_sensitivity: string; created_at: string; updated_at: string
+}
+
+export interface CustomerSegment {
+  id: string; org_id: string; name: string; segment_type: string
+  includes_minors: boolean; includes_healthcare: boolean; includes_financial: boolean
+  geography_ids: string[]; lob_ids: string[]; estimated_size: string | null; created_at: string
+}
+
+export interface ThirdParty {
+  id: string; org_id: string; name: string; category: string; tier: string
+  geography_ids: string[]; sub_processors: string[]; last_assessed: string | null
+  assessment_status: string; created_at: string
+}
+
+export interface DataTech {
+  id: string; org_id: string; uses_ai_ml: boolean; ai_use_cases: string[]
+  cloud_providers: string[]; data_residency_requirements: string[]
+  handles_personal_data: boolean; handles_sensitive_personal_data: boolean
+  handles_payment_data: boolean; handles_health_data: boolean
+  handles_classified_data: boolean; core_tech_stack: string[]
+  created_at: string; updated_at: string
+}
+
+export interface ChangeLogEntry {
+  id: string; org_id: string; changed_by: string | null; changed_at: string
+  entity_type: string; entity_id: string | null; field_changed: string | null
+  old_value: unknown; new_value: unknown; change_summary: string | null
+  propagation_status: string; affected_modules: string[]
+  propagation_result: Record<string, unknown>
+}
+
+export interface FullProfile {
+  identity: OrgIdentity | null; lines_of_business: LOB[]; geographies: OrgGeo[]
+  industries: OrgIndustry[]; products: OrgProduct[]; customer_segments: CustomerSegment[]
+  third_parties: ThirdParty[]; data_tech: DataTech | null; pending_propagations: number
+}
+
+export interface PropagationModulePreview {
+  module: string; module_label: string; action_type: string; count: number
+  preview: Array<{ title: string; severity: string; rationale: string }>; status: string
+}
+
+export interface PropagationPreview {
+  change_log_id: string; change_summary: string
+  affected_modules: PropagationModulePreview[]
+}

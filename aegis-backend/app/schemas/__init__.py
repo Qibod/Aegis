@@ -423,3 +423,303 @@ class DashboardResponse(BaseModel):
     top_risks: list[RiskResponse]
     framework_coverage: list[dict[str, Any]]
     recent_signals: list[SignalResponse]
+
+
+# ── COMPANY PROFILE ───────────────────────────────────────────────────────────
+
+class OrgProfileResponse(AegisBase):
+    id: UUID
+    org_id: UUID
+    legal_name: str
+    trading_name: str | None = None
+    year_founded: int | None = None
+    employee_range: str | None = None
+    annual_revenue_range: str | None = None
+    hq_country: str | None = None
+    hq_city: str | None = None
+    stock_ticker: str | None = None
+    website: str | None = None
+    description: str | None = None
+    logo_url: str | None = None
+    updated_by: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OrgProfileCreate(BaseModel):
+    legal_name: str
+    trading_name: str | None = None
+    year_founded: int | None = None
+    employee_range: str | None = None
+    annual_revenue_range: str | None = None
+    hq_country: str | None = None
+    hq_city: str | None = None
+    stock_ticker: str | None = None
+    website: str | None = None
+    description: str | None = Field(None, max_length=500)
+    logo_url: str | None = None
+
+
+class OrgProfileUpdate(BaseModel):
+    legal_name: str | None = None
+    trading_name: str | None = None
+    year_founded: int | None = None
+    employee_range: str | None = None
+    annual_revenue_range: str | None = None
+    hq_country: str | None = None
+    hq_city: str | None = None
+    stock_ticker: str | None = None
+    website: str | None = None
+    description: str | None = Field(None, max_length=500)
+    logo_url: str | None = None
+
+
+class LOBResponse(AegisBase):
+    id: UUID
+    org_id: UUID
+    name: str
+    description: str | None = None
+    status: str
+    launch_date: str | None = None
+    revenue_contribution_pct: int | None = None
+    is_primary: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class LOBCreate(BaseModel):
+    name: str
+    description: str | None = None
+    status: str = "active"
+    launch_date: str | None = None
+    revenue_contribution_pct: int | None = None
+    is_primary: bool = False
+
+
+class LOBUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    status: str | None = None
+    launch_date: str | None = None
+    revenue_contribution_pct: int | None = None
+    is_primary: bool | None = None
+
+
+class GeographyResponse(AegisBase):
+    id: UUID
+    org_id: UUID
+    country: str
+    region: str | None = None
+    state_province: str | None = None
+    presence_type: str
+    lob_ids: list[str] = []
+    regulatory_flags: list[str] = []
+    created_at: datetime
+
+
+class GeographyCreate(BaseModel):
+    country: str = Field(..., min_length=2, max_length=2)
+    region: str | None = None
+    state_province: str | None = None
+    presence_type: str = "operational"
+    lob_ids: list[str] = []
+
+
+class IndustryResponse(AegisBase):
+    id: UUID
+    org_id: UUID
+    code: str
+    name: str
+    classification: str
+    lob_ids: list[str] = []
+    created_at: datetime
+
+
+class IndustryCreate(BaseModel):
+    code: str
+    name: str
+    classification: str = "secondary"
+    lob_ids: list[str] = []
+
+
+class ProductResponse(AegisBase):
+    id: UUID
+    org_id: UUID
+    name: str
+    description: str | None = None
+    product_type: str
+    lob_id: str | None = None
+    geography_ids: list[str] = []
+    customer_segment_ids: list[str] = []
+    status: str
+    launch_date: str | None = None
+    data_sensitivity: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProductCreate(BaseModel):
+    name: str
+    description: str | None = None
+    product_type: str = "product"
+    lob_id: str | None = None
+    geography_ids: list[str] = []
+    customer_segment_ids: list[str] = []
+    status: str = "live"
+    launch_date: str | None = None
+    data_sensitivity: str = "low"
+
+
+class ProductUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    product_type: str | None = None
+    lob_id: str | None = None
+    geography_ids: list[str] | None = None
+    customer_segment_ids: list[str] | None = None
+    status: str | None = None
+    launch_date: str | None = None
+    data_sensitivity: str | None = None
+
+
+class SegmentResponse(AegisBase):
+    id: UUID
+    org_id: UUID
+    name: str
+    segment_type: str
+    includes_minors: bool
+    includes_healthcare: bool
+    includes_financial: bool
+    geography_ids: list[str] = []
+    lob_ids: list[str] = []
+    estimated_size: str | None = None
+    created_at: datetime
+
+
+class SegmentCreate(BaseModel):
+    name: str
+    segment_type: str = "b2b"
+    includes_minors: bool = False
+    includes_healthcare: bool = False
+    includes_financial: bool = False
+    geography_ids: list[str] = []
+    lob_ids: list[str] = []
+    estimated_size: str | None = None
+
+
+class ThirdPartyResponse(AegisBase):
+    id: UUID
+    org_id: UUID
+    name: str
+    category: str
+    tier: str
+    geography_ids: list[str] = []
+    sub_processors: list[str] = []
+    last_assessed: str | None = None
+    assessment_status: str
+    created_at: datetime
+
+
+class ThirdPartyCreate(BaseModel):
+    name: str
+    category: str = "saas_vendor"
+    tier: str = "tier_2"
+    geography_ids: list[str] = []
+    sub_processors: list[str] = []
+    last_assessed: str | None = None
+    assessment_status: str = "not_assessed"
+
+
+class ThirdPartyUpdate(BaseModel):
+    name: str | None = None
+    category: str | None = None
+    tier: str | None = None
+    geography_ids: list[str] | None = None
+    sub_processors: list[str] | None = None
+    last_assessed: str | None = None
+    assessment_status: str | None = None
+
+
+class DataTechResponse(AegisBase):
+    id: UUID
+    org_id: UUID
+    uses_ai_ml: bool
+    ai_use_cases: list[str] = []
+    cloud_providers: list[str] = []
+    data_residency_requirements: list[str] = []
+    handles_personal_data: bool
+    handles_sensitive_personal_data: bool
+    handles_payment_data: bool
+    handles_health_data: bool
+    handles_classified_data: bool
+    core_tech_stack: list[str] = []
+    created_at: datetime
+    updated_at: datetime
+
+
+class DataTechUpdate(BaseModel):
+    uses_ai_ml: bool | None = None
+    ai_use_cases: list[str] | None = None
+    cloud_providers: list[str] | None = None
+    data_residency_requirements: list[str] | None = None
+    handles_personal_data: bool | None = None
+    handles_sensitive_personal_data: bool | None = None
+    handles_payment_data: bool | None = None
+    handles_health_data: bool | None = None
+    handles_classified_data: bool | None = None
+    core_tech_stack: list[str] | None = None
+
+
+class ChangeLogResponse(AegisBase):
+    id: UUID
+    org_id: UUID
+    changed_by: UUID | None = None
+    changed_at: datetime
+    entity_type: str
+    entity_id: UUID | None = None
+    field_changed: str | None = None
+    old_value: Any | None = None
+    new_value: Any | None = None
+    change_summary: str | None = None
+    propagation_status: str
+    affected_modules: list[str] = []
+    propagation_result: dict[str, Any] = {}
+
+
+class ChangeLogListResponse(BaseModel):
+    items: list[ChangeLogResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class FullProfileResponse(BaseModel):
+    identity: OrgProfileResponse | None = None
+    lines_of_business: list[LOBResponse] = []
+    geographies: list[GeographyResponse] = []
+    industries: list[IndustryResponse] = []
+    products: list[ProductResponse] = []
+    customer_segments: list[SegmentResponse] = []
+    third_parties: list[ThirdPartyResponse] = []
+    data_tech: DataTechResponse | None = None
+    pending_propagations: int = 0
+
+
+class PropagationModulePreview(BaseModel):
+    module: str
+    module_label: str
+    action_type: str
+    count: int
+    preview: list[dict[str, Any]] = []
+    status: str = "pending"
+
+
+class PropagationPreview(BaseModel):
+    change_log_id: UUID
+    change_summary: str
+    affected_modules: list[PropagationModulePreview] = []
+
+
+class PropagationApply(BaseModel):
+    change_log_id: UUID
+    approved_modules: list[str]  # module names to apply
