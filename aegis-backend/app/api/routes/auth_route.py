@@ -1,8 +1,10 @@
 """app/api/routes/auth_route.py — Login, register, token refresh"""
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +17,9 @@ from app.models import Organization, User
 from app.schemas import LoginRequest, RefreshRequest, TokenResponse, UserCreate, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# In-memory reset token store: {token: (user_id, expires_at)}
+_reset_tokens: dict[str, tuple[str, datetime]] = {}
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
@@ -69,9 +74,7 @@ async def me(user: Annotated[User, Depends(get_current_active_user)]):
     return user
 
 
-from pydantic import BaseModel as _BaseModel
-
-class ChangePasswordRequest(_BaseModel):
+class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
@@ -85,3 +88,46 @@ async def change_password(
         raise HTTPException(400, "Current password is incorrect")
     user.hashed_password = hash_password(payload.new_password)
     await db.commit()
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ForgotPasswordResponse(BaseModel):
+    token: str
+    message: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(payload: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    user = (await db.execute(select(User).where(User.email == payload.email))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "No account found with that email")
+    token = secrets.token_urlsafe(12)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=30)
+    _reset_tokens[token] = (str(user.id), expires)
+    return ForgotPasswordResponse(
+        token=token,
+        message="Copy this token and use it to set a new password. It expires in 30 minutes.",
+    )
+
+
+@router.post("/reset-password", status_code=204)
+async def reset_password(payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    entry = _reset_tokens.get(payload.token)
+    if not entry:
+        raise HTTPException(400, "Invalid or expired reset token")
+    user_id, expires = entry
+    if datetime.now(timezone.utc) > expires:
+        del _reset_tokens[payload.token]
+        raise HTTPException(400, "Reset token has expired")
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(400, "User not found")
+    user.hashed_password = hash_password(payload.new_password)
+    await db.commit()
+    del _reset_tokens[payload.token]

@@ -14,6 +14,15 @@ export const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Forgot-password state
+  const [showForgot, setShowForgot] = useState(false)
+  const [fpEmail, setFpEmail] = useState('')
+  const [fpToken, setFpToken] = useState('')
+  const [fpNewPwd, setFpNewPwd] = useState('')
+  const [fpLoading, setFpLoading] = useState(false)
+  const [fpError, setFpError] = useState('')
+  const [fpDone, setFpDone] = useState(false)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -33,6 +42,37 @@ export const LoginPage: React.FC = () => {
     }
   }
 
+  const handleGetToken = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFpLoading(true)
+    setFpError('')
+    try {
+      const res = await authApi.forgotPassword(fpEmail)
+      setFpToken(res.token)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setFpError(msg ?? 'Email not found')
+    } finally {
+      setFpLoading(false)
+    }
+  }
+
+  const handleResetPwd = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (fpNewPwd.length < 8) { setFpError('Password must be at least 8 characters'); return }
+    setFpLoading(true)
+    setFpError('')
+    try {
+      await authApi.resetPassword(fpToken, fpNewPwd)
+      setFpDone(true)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setFpError(msg ?? 'Reset failed — token may have expired')
+    } finally {
+      setFpLoading(false)
+    }
+  }
+
   return (
     <div style={authShell}>
       <div style={authCard}>
@@ -45,22 +85,83 @@ export const LoginPage: React.FC = () => {
           </div>
           <span style={{ fontSize: 18, fontWeight: 500, letterSpacing: -0.3 }}>Aegis</span>
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 300, letterSpacing: -0.4, marginBottom: 6 }}>Sign in</h1>
-        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 28 }}>
-          Intelligent GRC Platform
-        </p>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Input label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required />
-          <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
-          {error && <p style={{ fontSize: 12, color: 'var(--red)', marginTop: -6 }}>{error}</p>}
-          <Button variant="primary" size="md" type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>
-            Sign in →
-          </Button>
-        </form>
-        <p style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center', marginTop: 20 }}>
-          No account?{' '}
-          <Link to="/register" style={{ color: 'var(--accent2)', textDecoration: 'none' }}>Create one</Link>
-        </p>
+
+        {!showForgot ? (
+          <>
+            <h1 style={{ fontSize: 22, fontWeight: 300, letterSpacing: -0.4, marginBottom: 6 }}>Sign in</h1>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 28 }}>Intelligent GRC Platform</p>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <Input label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required />
+              <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+              {error && <p style={{ fontSize: 12, color: 'var(--red)', marginTop: -6 }}>{error}</p>}
+              <Button variant="primary" size="md" type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>
+                Sign in →
+              </Button>
+            </form>
+            <p style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center', marginTop: 16 }}>
+              <button
+                onClick={() => { setShowForgot(true); setFpEmail(email) }}
+                style={{ background: 'none', border: 'none', color: 'var(--accent2)', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}
+              >
+                Forgot password?
+              </button>
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center', marginTop: 8 }}>
+              No account?{' '}
+              <Link to="/register" style={{ color: 'var(--accent2)', textDecoration: 'none' }}>Create one</Link>
+            </p>
+          </>
+        ) : fpDone ? (
+          <>
+            <h1 style={{ fontSize: 20, fontWeight: 300, letterSpacing: -0.4, marginBottom: 8 }}>Password reset</h1>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 24 }}>Your password has been updated. You can now sign in.</p>
+            <Button variant="primary" size="md" style={{ width: '100%' }} onClick={() => { setShowForgot(false); setFpDone(false); setFpToken(''); setFpNewPwd('') }}>
+              Back to sign in →
+            </Button>
+          </>
+        ) : (
+          <>
+            <h1 style={{ fontSize: 20, fontWeight: 300, letterSpacing: -0.4, marginBottom: 6 }}>Reset password</h1>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 24 }}>
+              Enter your email to get a reset token, then set a new password.
+            </p>
+
+            <form onSubmit={handleGetToken} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+              <Input label="Email" type="email" value={fpEmail} onChange={e => setFpEmail(e.target.value)} placeholder="you@company.com" required />
+              <Button variant="primary" size="md" type="submit" loading={fpLoading && !fpToken} style={{ width: '100%' }}>
+                Get reset token
+              </Button>
+            </form>
+
+            {fpToken && (
+              <>
+                <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+                  <p style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6 }}>Your reset token (expires in 30 min):</p>
+                  <code style={{ fontSize: 13, color: 'var(--accent2)', wordBreak: 'break-all', fontFamily: 'monospace' }}>{fpToken}</code>
+                </div>
+                <form onSubmit={handleResetPwd} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <Input label="Reset token" value={fpToken} onChange={e => setFpToken(e.target.value)} required />
+                  <Input label="New password" type="password" value={fpNewPwd} onChange={e => setFpNewPwd(e.target.value)} placeholder="Min 8 characters" required />
+                  {fpError && <p style={{ fontSize: 12, color: 'var(--red)', marginTop: -4 }}>{fpError}</p>}
+                  <Button variant="primary" size="md" type="submit" loading={fpLoading} style={{ width: '100%' }}>
+                    Set new password →
+                  </Button>
+                </form>
+              </>
+            )}
+
+            {fpError && !fpToken && <p style={{ fontSize: 12, color: 'var(--red)', marginTop: -8 }}>{fpError}</p>}
+
+            <p style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center', marginTop: 20 }}>
+              <button
+                onClick={() => setShowForgot(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--accent2)', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}
+              >
+                ← Back to sign in
+              </button>
+            </p>
+          </>
+        )}
       </div>
     </div>
   )

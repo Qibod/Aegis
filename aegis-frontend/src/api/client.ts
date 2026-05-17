@@ -102,6 +102,12 @@ export const authApi = {
 
   changePassword: (current_password: string, new_password: string) =>
     api.post('/auth/change-password', { current_password, new_password }),
+
+  forgotPassword: (email: string) =>
+    api.post<{ token: string; message: string }>('/auth/forgot-password', { email }).then(r => r.data),
+
+  resetPassword: (token: string, new_password: string) =>
+    api.post('/auth/reset-password', { token, new_password }),
 }
 
 // ── Organizations ─────────────────────────────────────────────────────────────
