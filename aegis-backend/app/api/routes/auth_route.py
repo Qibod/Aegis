@@ -1,6 +1,10 @@
 """app/api/routes/auth_route.py — Login, register, token refresh"""
+import asyncio
 import re
 import secrets
+import structlog
+
+log = structlog.get_logger()
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -50,6 +54,23 @@ async def register(payload: UserCreate, org_name: str, db: AsyncSession = Depend
     )
     db.add(user)
     await db.flush()
+
+    # Fire-and-forget: kick off the completeness seeder for the new org.
+    # This populates Company Profile fields via the 4-strategy seeding loop
+    # so new accounts see data immediately rather than waiting for the nightly
+    # Celery beat task (reseed-unknown-fields, 02:00).
+    org_id_str = str(org.id)
+    company_name = org_name
+
+    async def _seed_new_org() -> None:
+        try:
+            from app.seeding.completeness_loop import seed_org
+            await seed_org(org_id=org_id_str, company_name=company_name)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("aegis.register.seeder_failed", org_id=org_id_str, error=str(exc))
+
+    asyncio.create_task(_seed_new_org())
+
     return user
 
 
