@@ -1,4 +1,5 @@
 """app/api/routes/auth_route.py — Login, register, token refresh"""
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
@@ -6,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import (
@@ -27,10 +29,20 @@ async def register(payload: UserCreate, org_name: str, db: AsyncSession = Depend
     existing = (await db.execute(select(User).where(User.email == payload.email))).scalar_one_or_none()
     if existing:
         raise HTTPException(409, "Email already registered")
-    slug = org_name.lower().replace(" ", "-")[:100]
+
+    base_slug = re.sub(r"[^a-z0-9-]+", "-", org_name.lower().strip())[:90].strip("-")
+    slug = base_slug
     org = Organization(name=org_name, slug=slug)
     db.add(org)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        slug = f"{base_slug}-{secrets.token_hex(3)}"
+        org = Organization(name=org_name, slug=slug)
+        db.add(org)
+        await db.flush()
+
     initials = "".join(w[0].upper() for w in payload.full_name.split()[:2])
     user = User(
         org_id=org.id, email=payload.email, full_name=payload.full_name,
