@@ -98,6 +98,11 @@ export interface Risk {
   owner: User | null
   created_at: string
   updated_at: string
+  lob_id: string | null
+  lob_name: string | null
+  geography_ids: string[]
+  product_ids: string[]
+  segment_ids: string[]
 }
 
 export interface RiskListResponse {
@@ -116,6 +121,36 @@ export interface RiskCreate {
   impact?: number
   framework_tags?: string[]
   owner_id?: string
+  lob_id?: string
+  geography_ids?: string[]
+  product_ids?: string[]
+  segment_ids?: string[]
+}
+
+// ── Risk Universe ──────────────────────────────────────────────────────────────
+export interface DomainCoverage {
+  domain: string
+  risk_count: number
+  avg_coverage_pct: number
+  worst_severity: RiskSeverity
+}
+
+export interface HeatCell {
+  lob_id: string
+  lob_name: string
+  domain: string
+  risk_count: number
+  worst_severity: RiskSeverity
+}
+
+export interface UniverseSummary {
+  total_risks: number
+  high_critical_count: number
+  unowned_count: number
+  avg_coverage_pct: number
+  domain_coverage: DomainCoverage[]
+  heat_cells: HeatCell[]
+  needs_attention: Risk[]
 }
 
 // ── Controls ──────────────────────────────────────────────────────────────────
