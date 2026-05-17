@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.context import build_org_profile_context
 from app.api.auth import get_current_active_user, get_org_id
 from app.database import get_db
 from app.models import Organization, User
@@ -42,10 +43,14 @@ async def get_org_profile(
 @router.post("/fingerprint", response_model=OrgFingerprintResponse)
 async def fingerprint(
     payload: OrgFingerprintRequest,
+    org_id: Annotated[UUID, Depends(get_org_id)],
     _: Annotated[User, Depends(get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
 ):
     from app.ai.fingerprint import fingerprint_company
-    result = await fingerprint_company(payload.company_name)
+    # Use verified Company Profile as primary context if it already exists
+    org_context = await build_org_profile_context(org_id, db)
+    result = await fingerprint_company(payload.company_name, org_context)
     return OrgFingerprintResponse(**result)
 
 
