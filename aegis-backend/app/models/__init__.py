@@ -16,6 +16,12 @@ Table overview:
   signals           — incoming radar signals
   control_checks    — continuous pulse monitoring results
   frameworks        — active compliance frameworks per org
+
+v2.1 additions:
+  seeding_attempts        — completeness loop attempt log
+  field_validations       — Validator A + B results per field
+  seeding_proposals       — daily re-seed proposals awaiting admin approval
+  assistant_interactions  — GRC assistant audit log (1-year retention)
 """
 
 import enum
@@ -137,6 +143,10 @@ class Organization(Base):
     # Onboarding state
     onboarding_complete = Column(Boolean, default=False)
     fingerprinted_at = Column(DateTime(timezone=True))
+
+    # v2.1: synthetic tenant flag (created by nightly monitoring runs; hard-deleted after 90 days)
+    is_synthetic = Column(Boolean, default=False)
+    synthetic_proposals_pending = Column(Integer, default=0)
 
     # Relationships
     users = relationship("User", back_populates="organization", cascade="all, delete-orphan")
@@ -949,6 +959,11 @@ class OrgProfile(Base):
     logo_url             = Column(String(500))
     updated_by           = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
 
+    # v2.1 seeding/validation state maps (keyed by field name)
+    field_status_map     = Column(JSONB, default=dict)
+    field_confidence_map = Column(JSONB, default=dict)
+    field_source_map     = Column(JSONB, default=dict)
+
     __table_args__ = (Index("ix_org_profiles_org_id", "org_id"),)
 
 
@@ -963,6 +978,10 @@ class LineOfBusiness(Base):
     launch_date              = Column(String(10))
     revenue_contribution_pct = Column(Integer)
     is_primary               = Column(Boolean, default=False)
+
+    field_status_map     = Column(JSONB, default=dict)
+    field_confidence_map = Column(JSONB, default=dict)
+    field_source_map     = Column(JSONB, default=dict)
 
     __table_args__ = (Index("ix_lob_org_id", "org_id"),)
 
@@ -979,6 +998,10 @@ class OrgGeography(Base):
     lob_ids          = Column(JSON, default=list)
     regulatory_flags = Column(JSON, default=list)
 
+    field_status_map     = Column(JSONB, default=dict)
+    field_confidence_map = Column(JSONB, default=dict)
+    field_source_map     = Column(JSONB, default=dict)
+
     __table_args__ = (Index("ix_geo_org_id", "org_id"),)
 
 
@@ -991,6 +1014,10 @@ class OrgIndustry(Base):
     name           = Column(String(255), nullable=False)
     classification = Column(String(20), nullable=False, default="secondary")
     lob_ids        = Column(JSON, default=list)
+
+    field_status_map     = Column(JSONB, default=dict)
+    field_confidence_map = Column(JSONB, default=dict)
+    field_source_map     = Column(JSONB, default=dict)
 
     __table_args__ = (Index("ix_industry_org_id", "org_id"),)
 
@@ -1010,6 +1037,10 @@ class OrgProduct(Base):
     launch_date          = Column(String(10))
     data_sensitivity     = Column(String(20), nullable=False, default="low")
 
+    field_status_map     = Column(JSONB, default=dict)
+    field_confidence_map = Column(JSONB, default=dict)
+    field_source_map     = Column(JSONB, default=dict)
+
     __table_args__ = (Index("ix_products_org_id", "org_id"),)
 
 
@@ -1027,6 +1058,10 @@ class CustomerSegment(Base):
     lob_ids             = Column(JSON, default=list)
     estimated_size      = Column(String(100))
 
+    field_status_map     = Column(JSONB, default=dict)
+    field_confidence_map = Column(JSONB, default=dict)
+    field_source_map     = Column(JSONB, default=dict)
+
     __table_args__ = (Index("ix_segments_org_id", "org_id"),)
 
 
@@ -1042,6 +1077,10 @@ class ThirdPartyDependency(Base):
     sub_processors    = Column(JSON, default=list)
     last_assessed     = Column(String(10))
     assessment_status = Column(String(20), nullable=False, default="not_assessed")
+
+    field_status_map     = Column(JSONB, default=dict)
+    field_confidence_map = Column(JSONB, default=dict)
+    field_source_map     = Column(JSONB, default=dict)
 
     __table_args__ = (Index("ix_third_parties_org_id", "org_id"),)
 
@@ -1061,6 +1100,10 @@ class DataTechProfile(Base):
     handles_health_data             = Column(Boolean, default=False)
     handles_classified_data         = Column(Boolean, default=False)
     core_tech_stack                 = Column(JSON, default=list)
+
+    field_status_map     = Column(JSONB, default=dict)
+    field_confidence_map = Column(JSONB, default=dict)
+    field_source_map     = Column(JSONB, default=dict)
 
     __table_args__ = (Index("ix_data_tech_org_id", "org_id"),)
 
@@ -1085,4 +1128,97 @@ class ProfileChangeLog(Base):
     __table_args__ = (
         Index("ix_change_log_org_id", "org_id"),
         Index("ix_change_log_changed_at", "org_id", "changed_at"),
+    )
+
+
+# ── V2.1 SEEDING & VALIDATION ─────────────────────────────────────────────────
+
+class SeedingAttempt(Base):
+    """One attempt by the completeness loop to fill a single field."""
+    __tablename__ = "seeding_attempts"
+
+    id             = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id         = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    entity_type    = Column(String(50), nullable=False)
+    entity_id      = Column(UUID(as_uuid=True), nullable=True)
+    field_name     = Column(String(100), nullable=False)
+    attempt_number = Column(Integer, nullable=False)
+    strategy       = Column(String(30), nullable=False)   # web_search|site_scrape|filings|llm_inference
+    query          = Column(Text, nullable=False)
+    result_value   = Column(JSONB, nullable=True)
+    confidence     = Column(Float, nullable=False, default=0.0)
+    source_urls    = Column(JSONB, nullable=False, default=list)
+    succeeded      = Column(Boolean, nullable=False, default=False)
+    failure_reason = Column(Text, nullable=True)
+    duration_ms    = Column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        Index("ix_seeding_attempts_org_id", "org_id"),
+        Index("ix_seeding_attempts_org_field", "org_id", "field_name"),
+    )
+
+
+class FieldValidation(Base):
+    """Single Validator A or B result for one field on one entity."""
+    __tablename__ = "field_validations"
+
+    id                  = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id              = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    entity_type         = Column(String(50), nullable=False)
+    entity_id           = Column(UUID(as_uuid=True), nullable=False)
+    field_name          = Column(String(100), nullable=False)
+    validator           = Column(String(10), nullable=False)   # "A", "B", or "user"
+    status              = Column(String(30), nullable=False)
+    seeded_value        = Column(JSONB, nullable=True)
+    proposed_alternative = Column(JSONB, nullable=True)
+    sources             = Column(JSONB, nullable=False, default=list)
+    notes               = Column(Text, nullable=False, default="")
+    confidence          = Column(Float, nullable=False, default=0.0)
+    resolution_source   = Column(String(20), nullable=True)   # "user" when manually resolved
+    validated_at        = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    duration_ms         = Column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        Index("ix_field_validations_org_id", "org_id"),
+        Index("ix_field_validations_lookup", "org_id", "entity_type", "entity_id", "field_name"),
+    )
+
+
+class SeedingProposal(Base):
+    """Created by the daily re-seed job; awaits admin approval before applying."""
+    __tablename__ = "seeding_proposals"
+
+    id             = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id         = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    entity_type    = Column(String(50), nullable=False)
+    entity_id      = Column(UUID(as_uuid=True), nullable=False)
+    field_name     = Column(String(100), nullable=False)
+    proposed_value = Column(JSONB, nullable=False)
+    confidence     = Column(Float, nullable=False)
+    sources        = Column(JSONB, nullable=False, default=list)
+    status         = Column(String(20), nullable=False, default="pending")  # pending|approved|rejected
+    resolved_at    = Column(DateTime(timezone=True), nullable=True)
+    resolved_by    = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    __table_args__ = (
+        Index("ix_seeding_proposals_org_id", "org_id"),
+        Index("ix_seeding_proposals_pending", "org_id", "status"),
+    )
+
+
+class AssistantInteraction(Base):
+    """Audit log for every GRC assistant message (1-year retention; not exposed to assistant)."""
+    __tablename__ = "assistant_interactions"
+
+    id         = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    org_id     = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    user_id    = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    session_id = Column(UUID(as_uuid=True), nullable=False)
+    role       = Column(String(15), nullable=False)   # user|assistant|tool
+    content    = Column(JSONB, nullable=False)
+    tool_name  = Column(String(100), nullable=True)
+
+    __table_args__ = (
+        Index("ix_assistant_interactions_org_session", "org_id", "session_id"),
+        Index("ix_assistant_interactions_user", "user_id"),
     )
