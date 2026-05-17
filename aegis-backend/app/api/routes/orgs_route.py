@@ -1,10 +1,13 @@
 """app/api/routes/orgs_route.py — Organization management"""
+import logging
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+log = logging.getLogger(__name__)
 
 from app.ai.context import build_org_profile_context
 from app.api.auth import get_current_active_user, get_org_id
@@ -48,10 +51,13 @@ async def fingerprint(
     db: AsyncSession = Depends(get_db),
 ):
     from app.ai.fingerprint import fingerprint_company
-    # Use verified Company Profile as primary context if it already exists
-    org_context = await build_org_profile_context(org_id, db)
-    result = await fingerprint_company(payload.company_name, org_context)
-    return OrgFingerprintResponse(**result)
+    try:
+        org_context = await build_org_profile_context(org_id, db)
+        result = await fingerprint_company(payload.company_name, org_context)
+        return OrgFingerprintResponse(**result)
+    except Exception as exc:
+        log.error("fingerprint failed for %r: %s", payload.company_name, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Fingerprinting failed. Please try again.")
 
 
 @router.post("/complete-onboarding", response_model=OrgResponse)
