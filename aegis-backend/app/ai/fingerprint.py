@@ -743,8 +743,114 @@ async def seed_org_from_fingerprint(
         except Exception:
             await db.rollback()
 
+    # ── 6. Company Profile tables ─────────────────────────────────────────────
+    # Populate OrgProfile and related tables from fingerprint data so that
+    # build_org_profile_context() returns rich context for all AI features
+    # (Risk Radar context-aware signals, Regulatory Agent, future fingerprints).
+    from sqlalchemy import select as sa_select
+    from app.models import (
+        OrgProfile, LineOfBusiness, OrgGeography, OrgIndustry,
+        CustomerSegment, DataTechProfile,
+    )
+
+    _J2ISO = {
+        "united states": "US", "united kingdom": "GB", "germany": "DE",
+        "netherlands": "NL", "france": "FR", "singapore": "SG",
+        "australia": "AU", "canada": "CA", "ireland": "IE",
+        "sweden": "SE", "switzerland": "CH", "japan": "JP",
+        "india": "IN", "brazil": "BR", "mexico": "MX",
+        "hong kong": "HK", "united arab emirates": "AE", "uae": "AE",
+        "south korea": "KR", "china": "CN", "italy": "IT",
+        "spain": "ES", "belgium": "BE", "denmark": "DK",
+        "norway": "NO", "finland": "FI", "new zealand": "NZ",
+        "south africa": "ZA", "israel": "IL", "poland": "PL",
+    }
+    jurisdiction = fingerprint.get("jurisdiction", "")
+    iso2 = _J2ISO.get(jurisdiction.lower(), "US")
+
+    existing_profile = (await db.execute(
+        sa_select(OrgProfile).where(OrgProfile.org_id == org_uuid)
+    )).scalar_one_or_none()
+
+    if not existing_profile:
+        db.add(OrgProfile(
+            org_id=org_uuid,
+            legal_name=fingerprint.get("company_name", ""),
+            description=(fingerprint.get("business_summary", "") or "")[:500],
+            employee_range=fingerprint.get("employee_range", ""),
+            hq_country=iso2,
+        ))
+        await db.flush()
+
+    for i, bl in enumerate(fingerprint.get("business_lines", [])[:10]):
+        db.add(LineOfBusiness(
+            org_id=org_uuid,
+            name=bl[:255],
+            status="active",
+            is_primary=(i == 0),
+        ))
+    if fingerprint.get("business_lines"):
+        await db.flush()
+
+    regs = fingerprint.get("detected_regulations", [])
+    db.add(OrgGeography(
+        org_id=org_uuid,
+        country=iso2,
+        presence_type="headquarters",
+        regulatory_flags=[r.split("(")[0].strip() for r in regs[:8]],
+    ))
+    await db.flush()
+
+    industry_label = fingerprint.get("industry_label", "")
+    if industry_label:
+        sic = (fingerprint.get("industry_code") or "")[:20]
+        db.add(OrgIndustry(
+            org_id=org_uuid,
+            code=(sic or industry_label[:20])[:20],
+            name=industry_label[:255],
+            classification="primary",
+        ))
+        await db.flush()
+
+    _CT_MAP = {
+        "consumer": "b2c", "individual": "b2c", "retail": "b2c",
+        "patient": "b2c", "enterprise": "b2b", "business": "b2b",
+        "corporate": "b2b", "institutional": "b2b",
+        "government": "b2g",
+    }
+    for ct in fingerprint.get("customer_types", [])[:6]:
+        seg_type = "b2c"
+        for kw, st in _CT_MAP.items():
+            if kw in ct.lower():
+                seg_type = st
+                break
+        db.add(CustomerSegment(
+            org_id=org_uuid,
+            name=ct[:255],
+            segment_type=seg_type,
+            includes_financial=any(kw in ct.lower() for kw in ("financial", "banking", "investor")),
+            includes_healthcare=any(kw in ct.lower() for kw in ("patient", "health", "medical")),
+        ))
+    if fingerprint.get("customer_types"):
+        await db.flush()
+
+    regs_lower = " ".join(regs).lower()
+    domains_lower = " ".join(
+        d.get("name", "") for d in fingerprint.get("risk_domains", [])
+    ).lower()
+    db.add(DataTechProfile(
+        org_id=org_uuid,
+        handles_personal_data=any(kw in regs_lower for kw in ("gdpr", "ccpa", "privacy", "data protection")),
+        handles_sensitive_personal_data=any(kw in regs_lower for kw in ("gdpr", "ccpa", "sensitive")),
+        handles_payment_data=any(kw in regs_lower for kw in ("pci", "payment")),
+        handles_health_data=any(kw in regs_lower for kw in ("hipaa", "health")),
+        uses_ai_ml=any(kw in domains_lower for kw in ("model", "algorithmic", "ai", "ml")),
+        data_residency_requirements=[jurisdiction] if jurisdiction else [],
+    ))
+    await db.flush()
+
     await db.commit()
     logger.info(
-        "seed_org_from_fingerprint complete: org=%s risks=%d controls=%d signals=%d",
+        "seed_org_from_fingerprint complete: org=%s risks=%d controls=%d signals=%d profile=populated",
         org_id, len(risk_rows), len(control_rows), len(initial_signals),
     )
