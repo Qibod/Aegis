@@ -29,6 +29,7 @@ from sqlalchemy import select, desc, func, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.context import OrgProfileContext, build_org_profile_context, format_context_for_prompt
 from app.api.auth import get_current_active_user, get_org_id
 from app.config import get_settings
 from app.database import get_db
@@ -144,9 +145,10 @@ async def list_changes(
         )
     )).scalars().all()
 
-    # Auto-seed if empty
+    # Auto-seed if empty — use org profile context to filter relevant changes
     if not rows:
-        await _seed_initial_changes(org_id, db)
+        org_context = await build_org_profile_context(org_id, db)
+        await _seed_initial_changes(org_id, db, org_context)
         rows = (await db.execute(
             q.options(selectinload(RegulatoryChange.tasks))
             .order_by(desc(RegulatoryChange.published_at))
@@ -224,13 +226,15 @@ async def assess_change(
     if not row:
         raise HTTPException(404, "Change not found")
 
-    # Load controls for context
+    # Load controls and company profile context
     controls = (await db.execute(
         select(Control).where(Control.org_id == org_id)
     )).scalars().all()
 
+    org_context = await build_org_profile_context(org_id, db)
+
     # Run AI assessment
-    assessment, matched, tasks_data = await _run_ai_assessment(row, controls)
+    assessment, matched, tasks_data = await _run_ai_assessment(row, controls, org_context)
 
     row.impact_assessment = assessment
     row.matched_controls  = matched
@@ -530,13 +534,20 @@ def _to_change_out(r: RegulatoryChange) -> ChangeOut:
 async def _run_ai_assessment(
     change: RegulatoryChange,
     controls: list[Control],
+    org_context: OrgProfileContext | None = None,
 ) -> tuple[str, list[dict], list[dict]]:
     """Call Claude to generate impact assessment + action plan."""
     control_summary = "\n".join(
         f"- {c.name} ({c.domain}) — {c.status.value}" for c in controls[:20]
     )
-    prompt = f"""You are a regulatory impact assessment specialist for a financial services firm.
 
+    org_block = ""
+    if org_context:
+        org_block = f"\nFIRM PROFILE:\n{format_context_for_prompt(org_context)}\n"
+    firm_descriptor = org_context.legal_name if org_context else "the firm"
+
+    prompt = f"""You are a regulatory impact assessment specialist for {firm_descriptor}.
+{org_block}
 REGULATORY CHANGE:
 Title: {change.title}
 Source: {change.source} | Regulation: {change.regulation_family} | Severity: {change.severity.value}
@@ -736,7 +747,11 @@ _INITIAL_CHANGES = [
 ]
 
 
-async def _seed_initial_changes(org_id: UUID, db: AsyncSession) -> None:
+async def _seed_initial_changes(
+    org_id: UUID,
+    db: AsyncSession,
+    org_context: OrgProfileContext | None = None,
+) -> None:
     now = datetime.now(timezone.utc)
     for ch in _INITIAL_CHANGES:
         deadline = now + timedelta(days=ch["deadline_days"])

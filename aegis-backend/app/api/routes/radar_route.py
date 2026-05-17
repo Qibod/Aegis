@@ -1,16 +1,25 @@
 """app/api/routes/radar_route.py"""
+import json
+import logging
 from typing import Annotated
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
 
+from anthropic import AsyncAnthropic
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.context import build_org_profile_context, format_context_for_prompt
 from app.api.auth import get_org_id
+from app.config import get_settings
 from app.database import get_db
 from app.models import Signal, SignalSeverity, SignalCategory
 from app.schemas import SignalListResponse, SignalResponse
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
+_claude = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 router = APIRouter(prefix="/radar", tags=["radar"])
 
@@ -123,6 +132,98 @@ _RADAR_CATALOG = [
 ]
 
 
+async def _generate_context_aware_signals(org_id: UUID, db: AsyncSession) -> bool:
+    """
+    Generate org-specific radar signals via Claude using the Company Profile.
+    Returns True if signals were generated, False if the profile is too sparse
+    (falls back to the hardcoded catalogue).
+    """
+    org_context = await build_org_profile_context(org_id, db)
+    if org_context is None or (
+        not org_context.lines_of_business
+        and not org_context.geographies
+        and not org_context.industries
+    ):
+        return False
+
+    context_block = format_context_for_prompt(org_context)
+    now = datetime.now(timezone.utc)
+
+    prompt = f"""You are a senior GRC analyst. Generate 8-10 relevant risk radar signals for the company below.
+Signals must be specific to this company's profile — industries, geographies, products, and customer segments.
+Do NOT produce generic financial-sector signals unless the company actually operates in financial services.
+
+{context_block}
+
+Return a JSON array of signal objects. Each object must have:
+{{
+  "category": "regulatory|threat|vendor|macro",
+  "severity": "critical|high|medium|info",
+  "source": "<issuing body, e.g. 'ICO', 'NIST', 'Threat Intelligence'>",
+  "title": "<concise title, max 120 chars>",
+  "body": "<2-3 sentence description of the signal and why it matters to this company>",
+  "ai_recommendation": "<1-2 sentence specific action recommendation>",
+  "tags": ["<tag1>", "<tag2>"],
+  "days_ago": <integer 1-14>
+}}
+
+Prioritise signals relating to:
+- Regulations applicable to their geographies (e.g. GDPR if EU, CCPA if US, MAS TRM if SG)
+- Risks matching their sector and lines of business
+- Threats relevant to their technology stack and data types
+- Third-party and supply chain risks given their vendor tier profile
+
+Return ONLY a valid JSON array, no other text."""
+
+    try:
+        response = await _claude.messages.create(
+            model=settings.claude_model,
+            max_tokens=3000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        signals_data = json.loads(raw)
+    except Exception as e:
+        logger.warning("Context-aware signal generation failed: %s", e)
+        return False
+
+    cat_map = {
+        "regulatory": SignalCategory.regulatory,
+        "threat": SignalCategory.threat,
+        "vendor": SignalCategory.vendor,
+        "macro": SignalCategory.macro,
+    }
+    sev_map = {
+        "critical": SignalSeverity.critical,
+        "high": SignalSeverity.high,
+        "medium": SignalSeverity.medium,
+        "info": SignalSeverity.info,
+    }
+
+    for i, s in enumerate(signals_data[:12]):
+        db.add(Signal(
+            org_id=org_id,
+            source=s.get("source", "Aegis Radar"),
+            category=cat_map.get(s.get("category", "regulatory"), SignalCategory.regulatory),
+            severity=sev_map.get(s.get("severity", "medium"), SignalSeverity.medium),
+            title=s.get("title", "")[:500],
+            body=s.get("body", ""),
+            ai_recommendation=s.get("ai_recommendation"),
+            tags=s.get("tags", []),
+            relevance_score=0.90,
+            is_surfaced=True,
+            is_new=True,
+            published_at=now - timedelta(days=s.get("days_ago", i + 1)),
+            external_id=f"radar-ctx-{i}",
+        ))
+    await db.commit()
+    return True
+
+
 async def _seed_radar_signals(org_id: UUID, db: AsyncSession) -> None:
     """Idempotently seed the curated multi-category signal catalogue."""
     now = datetime.now(timezone.utc)
@@ -154,15 +255,17 @@ async def list_signals(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
-    # Auto-seed the curated multi-category catalogue once per org.
-    has_catalog = (await db.execute(
+    # Auto-seed once per org: prefer context-aware signals, fall back to catalogue.
+    has_seeded = (await db.execute(
         select(Signal.id).where(
             Signal.org_id == org_id,
-            Signal.external_id.like("radar-cat-%"),
+            Signal.external_id.like("radar-%"),
         ).limit(1)
     )).scalar_one_or_none()
-    if has_catalog is None:
-        await _seed_radar_signals(org_id, db)
+    if has_seeded is None:
+        context_generated = await _generate_context_aware_signals(org_id, db)
+        if not context_generated:
+            await _seed_radar_signals(org_id, db)
 
     q = (
         select(Signal)

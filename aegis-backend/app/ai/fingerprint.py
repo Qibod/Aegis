@@ -36,6 +36,7 @@ from typing import Any
 import httpx
 from anthropic import AsyncAnthropic
 
+from app.ai.context import OrgProfileContext, format_context_for_prompt
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -259,6 +260,7 @@ async def _infer_grc_profile(
     name: str,
     decomposition: dict[str, Any],
     jurisdiction_info: dict[str, str],
+    org_context: OrgProfileContext | None = None,
 ) -> dict[str, Any]:
     """
     Core GRC reasoning call.
@@ -281,8 +283,12 @@ async def _infer_grc_profile(
     jurisdiction = jurisdiction_info.get("jurisdiction", "United States")
     regulator = jurisdiction_info.get("regulator", "")
 
-    prompt = f"""You are a senior GRC consultant. Generate a comprehensive GRC fingerprint for the company below.
+    profile_block = ""
+    if org_context:
+        profile_block = f"\n## Verified Company Profile (use as primary context)\n{format_context_for_prompt(org_context)}\n"
 
+    prompt = f"""You are a senior GRC consultant. Generate a comprehensive GRC fingerprint for the company below.
+{profile_block}
 ## Company Profile
 Name: {name}
 Sector: {sector}
@@ -476,22 +482,30 @@ Scale the number of items to company size: enterprise = 8-12 processes, 7-9 doma
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-async def fingerprint_company(name: str) -> dict[str, Any]:
+async def fingerprint_company(
+    name: str,
+    org_context: OrgProfileContext | None = None,
+) -> dict[str, Any]:
     """
     Full fingerprinting pipeline. Returns a consolidated GRC profile.
 
+    If org_context is provided (Company Profile already exists), it is injected
+    into the GRC inference as verified primary context, skipping the Wikipedia
+    grounding step.
+
     Pipeline:
-      Step 0: Wikipedia context fetch (async, best-effort, ~300ms)
+      Step 0: Wikipedia context fetch (skipped when org_context provided)
       Step 1: Business decomposition — what does this company do? (Claude)
       Step 2: Jurisdiction resolution — parallel with step 1 where possible
-      Step 3: GRC profile — multi-segment aware (Claude, uses steps 1+2)
+      Step 3: GRC profile — multi-segment aware (Claude, uses steps 1+2 + profile)
     """
-    # Step 0: Grounding context (fire and forget — don't wait if slow)
     wiki_context = ""
-    try:
-        wiki_context = await asyncio.wait_for(_fetch_wikipedia_summary(name), timeout=4.0)
-    except asyncio.TimeoutError:
-        pass
+    if org_context is None:
+        # Step 0: Grounding context (fire and forget — don't wait if slow)
+        try:
+            wiki_context = await asyncio.wait_for(_fetch_wikipedia_summary(name), timeout=4.0)
+        except asyncio.TimeoutError:
+            pass
 
     # Steps 1 + 2 in parallel
     decomposition, jurisdiction_info = await asyncio.gather(
@@ -499,8 +513,8 @@ async def fingerprint_company(name: str) -> dict[str, Any]:
         _resolve_jurisdiction(name),
     )
 
-    # Step 3: Full GRC inference using decomposition context
-    grc = await _infer_grc_profile(name, decomposition, jurisdiction_info)
+    # Step 3: Full GRC inference using decomposition context + profile if available
+    grc = await _infer_grc_profile(name, decomposition, jurisdiction_info, org_context)
 
     return {
         # Identity
