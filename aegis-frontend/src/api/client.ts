@@ -99,6 +99,9 @@ export const authApi = {
 
   refresh: (refreshToken: string) =>
     api.post<TokenResponse>('/auth/refresh', { refresh_token: refreshToken }).then(r => r.data),
+
+  changePassword: (current_password: string, new_password: string) =>
+    api.post('/auth/change-password', { current_password, new_password }),
 }
 
 // ── Organizations ─────────────────────────────────────────────────────────────

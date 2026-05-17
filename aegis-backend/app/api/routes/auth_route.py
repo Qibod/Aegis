@@ -67,3 +67,21 @@ async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def me(user: Annotated[User, Depends(get_current_active_user)]):
     return user
+
+
+from pydantic import BaseModel as _BaseModel
+
+class ChangePasswordRequest(_BaseModel):
+    current_password: str
+    new_password: str
+
+@router.post("/change-password", status_code=204)
+async def change_password(
+    payload: ChangePasswordRequest,
+    user: Annotated[User, Depends(get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_password(payload.current_password, user.hashed_password):
+        raise HTTPException(400, "Current password is incorrect")
+    user.hashed_password = hash_password(payload.new_password)
+    await db.commit()

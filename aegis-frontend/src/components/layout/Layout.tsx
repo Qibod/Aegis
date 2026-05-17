@@ -3,10 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, AlertTriangle, Shield, GitBranch,
   Calendar, Radio, Activity, Settings, LogOut, Clock, BookOpen, Layers, Bot,
-  Sun, Moon, Building2,
+  Sun, Moon, Building2, KeyRound,
 } from 'lucide-react'
 import { useAuthStore, useUIStore } from '@/store'
 import { Avatar, LiveDot } from '@/components/ui'
+import { authApi } from '@/api/client'
 import styles from './Layout.module.css'
 
 // ── Theme helpers ─────────────────────────────────────────────────────────────
@@ -50,9 +51,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthStore()
-  const { toasts, removeToast } = useUIStore()
+  const { toasts, removeToast, addToast } = useUIStore()
 
   const [theme, setTheme] = useState<'dark' | 'light'>(getInitialTheme)
+  const [showChangePwd, setShowChangePwd] = useState(false)
+  const [pwdForm, setPwdForm] = useState({ current: '', next: '', confirm: '' })
+  const [pwdError, setPwdError] = useState('')
+  const [pwdLoading, setPwdLoading] = useState(false)
 
   useEffect(() => { applyTheme(theme) }, [theme])
 
@@ -61,6 +66,36 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const handleLogout = () => {
     logout()
     navigate('/login')
+  }
+
+  const openChangePwd = () => {
+    setPwdForm({ current: '', next: '', confirm: '' })
+    setPwdError('')
+    setShowChangePwd(true)
+  }
+
+  const handleChangePwd = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (pwdForm.next !== pwdForm.confirm) {
+      setPwdError('New passwords do not match')
+      return
+    }
+    if (pwdForm.next.length < 8) {
+      setPwdError('New password must be at least 8 characters')
+      return
+    }
+    setPwdLoading(true)
+    setPwdError('')
+    try {
+      await authApi.changePassword(pwdForm.current, pwdForm.next)
+      setShowChangePwd(false)
+      addToast({ type: 'success', title: 'Password changed successfully' })
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setPwdError(msg ?? 'Failed to change password')
+    } finally {
+      setPwdLoading(false)
+    }
   }
 
   return (
@@ -129,6 +164,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <span className={styles.navIcon}><Settings size={15} /></span>
               <span className={styles.navLabel}>Settings</span>
             </button>
+            <button className={styles.navItem} onClick={openChangePwd}>
+              <span className={styles.navIcon}><KeyRound size={15} /></span>
+              <span className={styles.navLabel}>Change password</span>
+            </button>
             <button className={styles.navItem} onClick={handleLogout}>
               <span className={styles.navIcon}><LogOut size={15} /></span>
               <span className={styles.navLabel}>Sign out</span>
@@ -141,6 +180,49 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           {children}
         </main>
       </div>
+
+      {/* Change Password Modal */}
+      {showChangePwd && (
+        <div className={styles.modalOverlay} onClick={() => setShowChangePwd(false)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <span>Change password</span>
+              <button className={styles.modalClose} onClick={() => setShowChangePwd(false)}>×</button>
+            </div>
+            <form onSubmit={handleChangePwd} className={styles.modalBody}>
+              <label className={styles.fieldLabel}>Current password</label>
+              <input
+                type="password"
+                className={styles.field}
+                value={pwdForm.current}
+                onChange={e => setPwdForm(f => ({ ...f, current: e.target.value }))}
+                required
+                autoFocus
+              />
+              <label className={styles.fieldLabel}>New password</label>
+              <input
+                type="password"
+                className={styles.field}
+                value={pwdForm.next}
+                onChange={e => setPwdForm(f => ({ ...f, next: e.target.value }))}
+                required
+              />
+              <label className={styles.fieldLabel}>Confirm new password</label>
+              <input
+                type="password"
+                className={styles.field}
+                value={pwdForm.confirm}
+                onChange={e => setPwdForm(f => ({ ...f, confirm: e.target.value }))}
+                required
+              />
+              {pwdError && <div className={styles.fieldError}>{pwdError}</div>}
+              <button type="submit" className={styles.submitBtn} disabled={pwdLoading}>
+                {pwdLoading ? 'Saving…' : 'Update password'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Toast stack */}
       <div className={styles.toastStack}>
