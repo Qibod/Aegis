@@ -89,7 +89,7 @@ export const LoginPage: React.FC = () => {
         {!showForgot ? (
           <>
             <h1 style={{ fontSize: 22, fontWeight: 300, letterSpacing: -0.4, marginBottom: 6 }}>Sign in</h1>
-            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 28 }}>Intelligent GRC Platform</p>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 28 }}>Intelligent GRC &amp; Compliance Platform</p>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <Input label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required />
               <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
