@@ -67,6 +67,16 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.check_all_aws_controls",
         "schedule": crontab(minute=0),  # hourly
     },
+    # v2.1 — daily re-seed of unknown fields (02:00 UTC)
+    "reseed-unknown-fields": {
+        "task": "app.tasks.reseed_unknowns.reseed_all_orgs",
+        "schedule": crontab(minute=0, hour=2),
+    },
+    # v2.1 — hard-delete synthetic tenants older than 90 days (03:00 UTC)
+    "cleanup-synthetic-tenants": {
+        "task": "app.tasks.cleanup_synthetic_tenants.cleanup_old_synthetic_tenants",
+        "schedule": crontab(minute=0, hour=3),
+    },
 }
 
 

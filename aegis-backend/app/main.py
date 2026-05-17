@@ -91,6 +91,8 @@ def create_app() -> FastAPI:
     from app.api.routes.audit_report_route import router as audit_report_router
     from app.api.routes.audit_copilot_route import router as audit_copilot_router
     from app.api.routes.profile_route import router as profile_router
+    from app.api.routes.validation_route import router as validation_router
+    from app.api.routes.assistant_route import router as assistant_router
     from app.realtime.websocket import ws_router
 
     API_PREFIX = "/api/v1"
@@ -110,6 +112,8 @@ def create_app() -> FastAPI:
     app.include_router(audit_report_router,  prefix=API_PREFIX)
     app.include_router(audit_copilot_router, prefix=API_PREFIX)
     app.include_router(profile_router,       prefix=API_PREFIX)
+    app.include_router(validation_router,    prefix=API_PREFIX)
+    app.include_router(assistant_router,     prefix=API_PREFIX)
     app.include_router(ws_router)  # WebSocket — no prefix
 
     # ── Health check ───────────────────────────────────────────────────────

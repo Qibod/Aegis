@@ -9,6 +9,8 @@ import { useAuthStore, useUIStore } from '@/store'
 import { Avatar, LiveDot } from '@/components/ui'
 import { authApi } from '@/api/client'
 import styles from './Layout.module.css'
+import { AssistantProvider } from '@/components/assistant/AssistantProvider'
+import { GRCAssistant } from '@/components/assistant/GRCAssistant'
 
 // ── Theme helpers ─────────────────────────────────────────────────────────────
 function getInitialTheme(): 'dark' | 'light' {
@@ -99,6 +101,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   }
 
   return (
+    <AssistantProvider>
     <div className={styles.shell}>
       {/* Topbar */}
       <header className={styles.topbar}>
@@ -237,6 +240,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
         ))}
       </div>
+
+      <GRCAssistant />
     </div>
+    </AssistantProvider>
   )
 }

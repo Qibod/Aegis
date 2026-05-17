@@ -351,4 +351,36 @@ export const timeMachineApi = {
   simulations: () => api.get<SimulationResult[]>('/time-machine/simulations').then(r => r.data),
 }
 
+// ── v2.1 Validation & Proposals ───────────────────────────────────────────────
+export const validationApi = {
+  getState: (entityType: string, entityId: string) =>
+    api.get(`/validation/state/${entityType}/${entityId}`).then(r => r.data),
+
+  verifyField: (entityType: string, entityId: string, fieldName: string) =>
+    api.post(`/validation/verify/${entityType}/${entityId}/${fieldName}`).then(r => r.data),
+
+  resolveField: (validationId: string, body: {
+    chosen_value: unknown
+    resolution_source: 'seeded' | 'alternative' | 'user_input'
+    source_note?: string
+  }) => api.post(`/validation/resolve/${validationId}`, body).then(r => r.data),
+}
+
+export const proposalsApi = {
+  list: () =>
+    api.get('/validation/proposals').then(r => r.data),
+
+  approve: (id: string) =>
+    api.post(`/validation/proposals/${id}/approve`).then(r => r.data),
+
+  reject: (id: string) =>
+    api.post(`/validation/proposals/${id}/reject`).then(r => r.data),
+}
+
+// ── v2.1 GRC Assistant WebSocket ──────────────────────────────────────────────
+export function createAssistantWS(): WebSocket {
+  const base = (import.meta.env.VITE_API_BASE_URL ?? '/api/v1').replace(/^http/, 'ws')
+  return new WebSocket(`${base}/assistant/ws`)
+}
+
 export default api

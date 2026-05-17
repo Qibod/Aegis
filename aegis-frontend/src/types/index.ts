@@ -703,3 +703,55 @@ export interface PropagationPreview {
   change_log_id: string; change_summary: string
   affected_modules: PropagationModulePreview[]
 }
+
+// ── v2.1 Verification & Seeding ───────────────────────────────────────────────
+
+export type FieldStatus =
+  | 'seeded' | 'unknown' | 'user_edited'
+  | 'verified' | 'disputed' | 'verified_after_dispute'
+  | 'flagged_for_review' | 'unverifiable'
+
+export interface FieldValidationState {
+  status_a: string | null
+  status_b: string | null
+  proposed_alternative: { value: unknown } | null
+  latest_sources: string[] | null
+  last_validated_at: string | null
+}
+
+export interface EntityVerificationState {
+  entity_type: string
+  entity_id: string
+  fields: Record<string, FieldValidationState>
+}
+
+export interface SeedingProposal {
+  id: string
+  entity_type: string
+  entity_id: string
+  field_name: string
+  proposed_value: { value: unknown }
+  confidence: number
+  sources: string[]
+  created_at: string
+}
+
+// ── v2.1 GRC Assistant ────────────────────────────────────────────────────────
+
+export type AssistantRole = 'user' | 'assistant' | 'tool'
+
+export interface AssistantMessage {
+  role: AssistantRole
+  content: string
+  timestamp: string
+}
+
+export interface AssistantChangeProposal {
+  change_id: string
+  entity_type: string
+  field_name: string
+  current_value: unknown
+  proposed_value: unknown
+  rationale: string
+  status: 'pending_approval' | 'approved' | 'rejected'
+}

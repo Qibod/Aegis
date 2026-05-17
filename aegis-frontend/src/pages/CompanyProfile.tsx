@@ -5,12 +5,16 @@ import {
   History, Pencil, Plus, Trash2, Check, X, ChevronRight,
   AlertTriangle, Clock,
 } from 'lucide-react'
-import { profileApi } from '@/api/client'
+import { profileApi, validationApi } from '@/api/client'
 import { useAuthStore, useUIStore } from '@/store'
 import { Spinner } from '@/components/ui'
+import { VerificationTick } from '@/components/profile/VerificationTick'
+import { DisputedFieldModal } from '@/components/profile/DisputedFieldModal'
+import { ReseedProposalsPanel } from '@/components/profile/ReseedProposalsPanel'
 import type {
   FullProfile, OrgIdentity, LOB, OrgGeo, OrgIndustry,
   OrgProduct, CustomerSegment, ThirdParty, DataTech, PropagationPreview,
+  FieldStatus,
 } from '@/types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -64,12 +68,41 @@ const SectionCard: React.FC<{
   </div>
 )
 
-const Field: React.FC<{ label: string; value?: string | number | null; children?: React.ReactNode }> = ({ label, value, children }) => (
+const Field: React.FC<{
+  label: string; value?: string | number | null; children?: React.ReactNode; tick?: React.ReactNode
+}> = ({ label, value, children, tick }) => (
   <div style={{ marginBottom: 14 }}>
     <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--text3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
-    {children ?? <div style={{ fontSize: 12, color: value ? 'var(--text)' : 'var(--text3)' }}>{value ?? '—'}</div>}
+    {children ?? (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+        <span style={{ fontSize: 12, color: value ? 'var(--text)' : 'var(--text3)' }}>{value ?? '—'}</span>
+        {tick}
+      </div>
+    )}
   </div>
 )
+
+// ── Verification state hook ───────────────────────────────────────────────────
+
+interface ValidatorSlot { status: string; confidence?: number; sources?: string[]; validated_at?: string | null; proposed_alternative?: { value: unknown } | null }
+
+function useEntityVerification(entityType: string, entityId: string | undefined) {
+  return useQuery({
+    queryKey: ['verification', entityType, entityId],
+    queryFn: () => validationApi.getState(entityType, entityId!),
+    enabled: !!entityId,
+    staleTime: 60_000,
+  })
+}
+
+interface DisputedField {
+  validationId: string
+  fieldLabel: string
+  seededValue: unknown
+  seededConfidence?: number
+  alternativeValue: unknown
+  alternativeConfidence?: number
+}
 
 const Inp: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (p) => (
   <input className="input" style={{ width: '100%', fontSize: 12, padding: '5px 8px' }} {...p} />
@@ -143,6 +176,7 @@ export const CompanyProfilePage: React.FC = () => {
   const [activeSection, setActiveSection] = useState('identity')
   const [propagation, setPropagation] = useState<PropagationPreview | null>(null)
   const [applyingProp, setApplyingProp] = useState(false)
+  const [disputedField, setDisputedField] = useState<DisputedField | null>(null)
 
   const refs = Object.fromEntries(SECTIONS.map(s => [s.id, useRef<HTMLDivElement>(null)]))
 
@@ -215,7 +249,9 @@ export const CompanyProfilePage: React.FC = () => {
             <div className="page-sub">Canonical context for all AI features — changes propagate across the platform</div>
           </div>
 
-          <IdentitySection     data={profile?.identity ?? null}           isAdmin={isAdmin} onSaved={pollPropagation} onInvalidate={invalidate} addToast={addToast} />
+          <ReseedProposalsPanel isAdmin={isAdmin} onApplied={invalidate} />
+
+          <IdentitySection     data={profile?.identity ?? null}           isAdmin={isAdmin} onSaved={pollPropagation} onInvalidate={invalidate} addToast={addToast} onDisputed={setDisputedField} />
           <LobSection          data={profile?.lines_of_business ?? []}    isAdmin={isAdmin} onSaved={pollPropagation} onInvalidate={invalidate} addToast={addToast} />
           <GeoSection          data={profile?.geographies ?? []}          isAdmin={isAdmin} onSaved={pollPropagation} onInvalidate={invalidate} addToast={addToast} />
           <IndustrySection     data={profile?.industries ?? []}           isAdmin={isAdmin} onSaved={pollPropagation} onInvalidate={invalidate} addToast={addToast} />
@@ -235,15 +271,63 @@ export const CompanyProfilePage: React.FC = () => {
           applying={applyingProp}
         />
       )}
+
+      {disputedField && (
+        <DisputedFieldModal
+          validationId={disputedField.validationId}
+          fieldLabel={disputedField.fieldLabel}
+          seededValue={disputedField.seededValue}
+          seededConfidence={disputedField.seededConfidence}
+          alternativeValue={disputedField.alternativeValue}
+          alternativeConfidence={disputedField.alternativeConfidence}
+          onResolved={invalidate}
+          onClose={() => setDisputedField(null)}
+        />
+      )}
     </div>
   )
 }
 
 // ── Section: Identity ─────────────────────────────────────────────────────────
-const IdentitySection: React.FC<SectionProps<OrgIdentity | null>> = ({ data, isAdmin, onSaved, onInvalidate, addToast }) => {
+const IdentitySection: React.FC<SectionProps<OrgIdentity | null>> = ({ data, isAdmin, onSaved, onInvalidate, addToast, onDisputed }) => {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<Partial<OrgIdentity>>({})
   const [saving, setSaving] = useState(false)
+
+  const { data: vState, refetch: refetchV } = useEntityVerification('org_profiles', data?.id)
+  const vFields = (vState as { fields?: Record<string, { a?: ValidatorSlot; b?: ValidatorSlot }> })?.fields ?? {}
+
+  const tick = (fieldName: string, label: string) => {
+    const f = vFields[fieldName]
+    const statusMap = (data as unknown as Record<string, unknown>)?.[`field_status_map`] as Record<string, FieldStatus> | undefined
+    const fieldStatus = statusMap?.[fieldName]
+    const bResult = f?.b ?? null
+    return (
+      <VerificationTick
+        fieldStatus={fieldStatus}
+        validationA={f?.a ?? null}
+        validationB={bResult}
+        entityType="org_profiles"
+        entityId={data?.id ?? ''}
+        fieldName={fieldName}
+        isAdmin={isAdmin}
+        onReVerify={() => {
+          if (!data?.id) return
+          validationApi.verifyField('org_profiles', data.id, fieldName).then(() => refetchV())
+          if ((fieldStatus === 'flagged_for_review') && bResult?.proposed_alternative && onDisputed) {
+            onDisputed({
+              validationId: fieldName,
+              fieldLabel: label,
+              seededValue: (data as unknown as Record<string, unknown>)?.[fieldName],
+              seededConfidence: f?.a?.confidence,
+              alternativeValue: bResult.proposed_alternative.value,
+              alternativeConfidence: bResult.confidence,
+            })
+          }
+        }}
+      />
+    )
+  }
 
   const startEdit = () => { setForm(data ?? {}); setEditing(true) }
   const cancel = () => setEditing(false)
@@ -284,15 +368,15 @@ const IdentitySection: React.FC<SectionProps<OrgIdentity | null>> = ({ data, isA
         </div>
       ) : data ? (
         <div className="grid-2">
-          <Field label="Legal name" value={data.legal_name} />
-          <Field label="Trading name" value={data.trading_name} />
-          <Field label="HQ" value={[data.hq_city, data.hq_country].filter(Boolean).join(', ')} />
-          <Field label="Employee range" value={data.employee_range} />
-          <Field label="Revenue range" value={data.annual_revenue_range} />
-          <Field label="Founded" value={data.year_founded?.toString()} />
-          <Field label="Website" value={data.website} />
-          <Field label="Ticker" value={data.stock_ticker} />
-          {data.description && <div style={{ gridColumn: '1/-1' }}><Field label="Description" value={data.description} /></div>}
+          <Field label="Legal name" value={data.legal_name} tick={tick('legal_name', 'Legal name')} />
+          <Field label="Trading name" value={data.trading_name} tick={tick('trading_name', 'Trading name')} />
+          <Field label="HQ" value={[data.hq_city, data.hq_country].filter(Boolean).join(', ')} tick={tick('hq_country', 'HQ country')} />
+          <Field label="Employee range" value={data.employee_range} tick={tick('employee_range', 'Employee range')} />
+          <Field label="Revenue range" value={data.annual_revenue_range} tick={tick('annual_revenue_range', 'Annual revenue range')} />
+          <Field label="Founded" value={data.year_founded?.toString()} tick={tick('year_founded', 'Year founded')} />
+          <Field label="Website" value={data.website} tick={tick('website', 'Website')} />
+          <Field label="Ticker" value={data.stock_ticker} tick={tick('stock_ticker', 'Stock ticker')} />
+          {data.description && <div style={{ gridColumn: '1/-1' }}><Field label="Description" value={data.description} tick={tick('description', 'Description')} /></div>}
         </div>
       ) : (
         <EmptyRow text="No identity configured — click Edit to set up your company profile." />
@@ -775,4 +859,5 @@ interface SectionProps<T> {
   onSaved: (changeLogId: string) => void
   onInvalidate: () => void
   addToast: (t: { type: 'success' | 'error' | 'info' | 'warning'; title: string; body?: string }) => void
+  onDisputed?: (d: DisputedField) => void
 }
