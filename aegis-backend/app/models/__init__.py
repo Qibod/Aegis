@@ -25,7 +25,7 @@ from sqlalchemy import (
     Integer, String, Text, JSON, UniqueConstraint, Index,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.sql import func
@@ -205,13 +205,21 @@ class Risk(Base):
     # Embedding for semantic search (stored as array via pgvector)
     embedding = Column(JSONB)                       # [float, ...] — swap for Vector(1536) with pgvector
 
+    # Risk Universe linkage
+    lob_id = Column(UUID(as_uuid=True), ForeignKey("lines_of_business.id", ondelete="SET NULL"), nullable=True)
+    geography_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}")
+    product_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}")
+    segment_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}")
+
     __table_args__ = (
         Index("ix_risks_org_severity", "org_id", "inherent_severity"),
+        Index("ix_risks_lob_id", "lob_id"),
     )
 
     organization = relationship("Organization", back_populates="risks")
     owner = relationship("User", foreign_keys=[owner_id], back_populates="owned_risks")
     canvas_node = relationship("CanvasNode", back_populates="risk", uselist=False)
+    lob = relationship("LineOfBusiness", foreign_keys=[lob_id], lazy="joined")
 
 
 # ── CONTROLS ──────────────────────────────────────────────────────────────────

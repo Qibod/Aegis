@@ -7,6 +7,7 @@ Uses asyncpg driver for full async PostgreSQL support.
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -93,10 +94,18 @@ async def get_db_context() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def create_tables() -> None:
-    """Create all tables — used in development. Production uses Alembic."""
+    """Create all tables and apply any idempotent column migrations."""
     from app.models import Base
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Idempotent column additions for risk universe (safe on fresh and existing DBs)
+        for stmt in [
+            "ALTER TABLE risks ADD COLUMN IF NOT EXISTS lob_id UUID REFERENCES lines_of_business(id) ON DELETE SET NULL",
+            "ALTER TABLE risks ADD COLUMN IF NOT EXISTS geography_ids UUID[] NOT NULL DEFAULT '{}'",
+            "ALTER TABLE risks ADD COLUMN IF NOT EXISTS product_ids UUID[] NOT NULL DEFAULT '{}'",
+            "ALTER TABLE risks ADD COLUMN IF NOT EXISTS segment_ids UUID[] NOT NULL DEFAULT '{}'",
+        ]:
+            await conn.execute(text(stmt))
 
 
 async def drop_tables() -> None:

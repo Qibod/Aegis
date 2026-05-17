@@ -133,6 +133,10 @@ class RiskCreate(BaseModel):
     impact: int = Field(3, ge=1, le=5)
     framework_tags: list[str] = []
     owner_id: UUID | None = None
+    lob_id: UUID | None = None
+    geography_ids: list[UUID] = []
+    product_ids: list[UUID] = []
+    segment_ids: list[UUID] = []
 
 
 class RiskUpdate(BaseModel):
@@ -145,6 +149,10 @@ class RiskUpdate(BaseModel):
     impact: int | None = Field(None, ge=1, le=5)
     framework_tags: list[str] | None = None
     owner_id: UUID | None = None
+    lob_id: UUID | None = None
+    geography_ids: list[UUID] | None = None
+    product_ids: list[UUID] | None = None
+    segment_ids: list[UUID] | None = None
 
 
 class RiskResponse(AegisBase):
@@ -164,6 +172,11 @@ class RiskResponse(AegisBase):
     owner: UserResponse | None
     created_at: datetime
     updated_at: datetime
+    lob_id: UUID | None = None
+    lob_name: str | None = None
+    geography_ids: list[UUID] = []
+    product_ids: list[UUID] = []
+    segment_ids: list[UUID] = []
 
 
 class RiskListResponse(BaseModel):
@@ -171,6 +184,33 @@ class RiskListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ── RISK UNIVERSE ─────────────────────────────────────────────────────────────
+
+class DomainCoverage(BaseModel):
+    domain: str
+    risk_count: int
+    avg_coverage_pct: float
+    worst_severity: str
+
+
+class HeatCell(BaseModel):
+    lob_id: str
+    lob_name: str
+    domain: str
+    risk_count: int
+    worst_severity: str
+
+
+class UniverseSummary(BaseModel):
+    total_risks: int
+    high_critical_count: int
+    unowned_count: int
+    avg_coverage_pct: float
+    domain_coverage: list[DomainCoverage]
+    heat_cells: list[HeatCell]
+    needs_attention: list[RiskResponse]
 
 
 # ── CONTROLS ──────────────────────────────────────────────────────────────────

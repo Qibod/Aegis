@@ -2,7 +2,7 @@ import axios from 'axios'
 import type {
   TokenResponse, LoginRequest, RegisterRequest, User,
   Organization, FingerprintResponse,
-  Risk, RiskListResponse, RiskCreate,
+  Risk, RiskListResponse, RiskCreate, UniverseSummary,
   Control, CanvasData, CanvasNode, CanvasEdge,
   AuditPlan, AuditTask,
   SignalListResponse, Signal,
@@ -179,8 +179,11 @@ export const dashboardApi = {
 
 // ── Risks ─────────────────────────────────────────────────────────────────────
 export const risksApi = {
-  list: (params?: { domain?: string; severity?: string; page?: number }) =>
+  list: (params?: { domain?: string; severity?: string; lob_id?: string; geo_id?: string; page?: number; page_size?: number }) =>
     api.get<RiskListResponse>('/risks', { params }).then(r => r.data),
+
+  universeSummary: () =>
+    api.get<UniverseSummary>('/risks/universe-summary').then(r => r.data),
 
   get: (id: string) => api.get<Risk>(`/risks/${id}`).then(r => r.data),
 
