@@ -100,10 +100,39 @@ async def create_tables() -> None:
         await conn.run_sync(Base.metadata.create_all)
         # Idempotent column additions for risk universe (safe on fresh and existing DBs)
         for stmt in [
+            # risk universe columns (added pre-v2.1)
             "ALTER TABLE risks ADD COLUMN IF NOT EXISTS lob_id UUID REFERENCES lines_of_business(id) ON DELETE SET NULL",
             "ALTER TABLE risks ADD COLUMN IF NOT EXISTS geography_ids UUID[] NOT NULL DEFAULT '{}'",
             "ALTER TABLE risks ADD COLUMN IF NOT EXISTS product_ids UUID[] NOT NULL DEFAULT '{}'",
             "ALTER TABLE risks ADD COLUMN IF NOT EXISTS segment_ids UUID[] NOT NULL DEFAULT '{}'",
+            # v2.1: synthetic tenant tracking on organizations
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_synthetic BOOLEAN NOT NULL DEFAULT false",
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS synthetic_proposals_pending INTEGER NOT NULL DEFAULT 0",
+            # v2.1: field verification maps on all 8 profile entity tables
+            "ALTER TABLE org_profiles ADD COLUMN IF NOT EXISTS field_status_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_profiles ADD COLUMN IF NOT EXISTS field_confidence_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_profiles ADD COLUMN IF NOT EXISTS field_source_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE lines_of_business ADD COLUMN IF NOT EXISTS field_status_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE lines_of_business ADD COLUMN IF NOT EXISTS field_confidence_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE lines_of_business ADD COLUMN IF NOT EXISTS field_source_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_geographies ADD COLUMN IF NOT EXISTS field_status_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_geographies ADD COLUMN IF NOT EXISTS field_confidence_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_geographies ADD COLUMN IF NOT EXISTS field_source_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_industries ADD COLUMN IF NOT EXISTS field_status_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_industries ADD COLUMN IF NOT EXISTS field_confidence_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_industries ADD COLUMN IF NOT EXISTS field_source_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_products ADD COLUMN IF NOT EXISTS field_status_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_products ADD COLUMN IF NOT EXISTS field_confidence_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_products ADD COLUMN IF NOT EXISTS field_source_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_customer_segments ADD COLUMN IF NOT EXISTS field_status_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_customer_segments ADD COLUMN IF NOT EXISTS field_confidence_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_customer_segments ADD COLUMN IF NOT EXISTS field_source_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_third_parties ADD COLUMN IF NOT EXISTS field_status_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_third_parties ADD COLUMN IF NOT EXISTS field_confidence_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_third_parties ADD COLUMN IF NOT EXISTS field_source_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_data_tech_profiles ADD COLUMN IF NOT EXISTS field_status_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_data_tech_profiles ADD COLUMN IF NOT EXISTS field_confidence_map JSONB NOT NULL DEFAULT '{}'",
+            "ALTER TABLE org_data_tech_profiles ADD COLUMN IF NOT EXISTS field_source_map JSONB NOT NULL DEFAULT '{}'",
         ]:
             await conn.execute(text(stmt))
 

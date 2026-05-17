@@ -145,8 +145,8 @@ class Organization(Base):
     fingerprinted_at = Column(DateTime(timezone=True))
 
     # v2.1: synthetic tenant flag (created by nightly monitoring runs; hard-deleted after 90 days)
-    is_synthetic = Column(Boolean, default=False)
-    synthetic_proposals_pending = Column(Integer, default=0)
+    is_synthetic = Column(Boolean, server_default='false', default=False)
+    synthetic_proposals_pending = Column(Integer, server_default='0', default=0)
 
     # Relationships
     users = relationship("User", back_populates="organization", cascade="all, delete-orphan")
