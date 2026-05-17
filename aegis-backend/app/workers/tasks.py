@@ -467,3 +467,122 @@ async def _recompute_coverage_async(risk_id: str, org_id: str):
         )).scalar_one_or_none()
         if risk:
             risk.control_coverage_pct = coverage
+
+
+@celery_app.task(name="app.workers.tasks.run_validation_for_field", bind=True, max_retries=2)
+def run_validation_for_field(self, org_id: str, entity_type: str, entity_id: str, field_name: str):
+    """Run Validator A (and possibly B) for a single field. Triggered by the Verify button."""
+    try:
+        _run_async(_run_field_validation_async(org_id, entity_type, entity_id, field_name))
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60)
+
+
+async def _run_field_validation_async(org_id: str, entity_type: str, entity_id: str, field_name: str):
+    import random
+    import time
+    from uuid import UUID
+
+    from sqlalchemy import select
+
+    from app.database import get_db_context
+    from app.models import FieldValidation, Organization, OrgProfile
+    from app.seeding.field_specs import FIELD_SPECS
+    from app.validation import validator_a, validator_b
+    from app.validation.orchestrator import _ENTITY_MODEL_MAP
+    from app.validation.status_machine import status_after_validator_a, status_after_validator_b
+
+    org_uuid = UUID(org_id)
+    entity_uuid = UUID(entity_id)
+
+    async with get_db_context() as db:
+        org = (await db.execute(
+            select(Organization).where(Organization.id == org_uuid)
+        )).scalar_one_or_none()
+        if not org:
+            return
+
+        profile = (await db.execute(
+            select(OrgProfile).where(OrgProfile.org_id == org_uuid)
+        )).scalar_one_or_none()
+        company_name = (profile.legal_name if profile else None) or org.name
+
+        model_cls = _ENTITY_MODEL_MAP.get(entity_type)
+        if not model_cls:
+            return
+
+        entity = (await db.execute(
+            select(model_cls).where(model_cls.id == entity_uuid, model_cls.org_id == org_uuid)
+        )).scalar_one_or_none()
+        if not entity:
+            return
+
+        specs = {spec.name: spec for spec in FIELD_SPECS.get(entity_type, [])}
+        spec = specs.get(field_name)
+        if not spec:
+            return
+
+        value = getattr(entity, field_name, None)
+        sources = (entity.field_source_map or {}).get(field_name, [])
+
+        t0 = time.time()
+        result_a = await validator_a.validate_field(
+            company_name=company_name,
+            entity_type=entity_type,
+            field_name=field_name,
+            field_label=spec.label,
+            seeded_value=value,
+            source_urls=sources,
+        )
+
+        db.add(FieldValidation(
+            org_id=org_uuid,
+            entity_type=entity_type,
+            entity_id=entity_uuid,
+            field_name=field_name,
+            validator="A",
+            status=result_a.verification_status,
+            seeded_value={"value": value},
+            sources=[result_a.primary_source_url] if result_a.primary_source_url else [],
+            notes=result_a.notes,
+            confidence=result_a.confidence,
+            duration_ms=int((time.time() - t0) * 1000),
+        ))
+
+        new_status = status_after_validator_a(result_a.verified, result_a.verification_status)
+
+        run_b = (result_a.verification_status == "disputed") or \
+                (result_a.verification_status == "verified" and random.random() < 0.05)
+
+        if run_b:
+            result_b = await validator_b.validate_field(
+                company_name=company_name,
+                entity_type=entity_type,
+                field_name=field_name,
+                field_label=spec.label,
+                seeded_value=value,
+                validator_a_result=result_a,
+                is_qa_sample=(result_a.verification_status == "verified"),
+            )
+            db.add(FieldValidation(
+                org_id=org_uuid,
+                entity_type=entity_type,
+                entity_id=entity_uuid,
+                field_name=field_name,
+                validator="B",
+                status=result_b.final_status,
+                seeded_value={"value": value},
+                proposed_alternative=(
+                    {"value": result_b.proposed_alternative}
+                    if result_b.proposed_alternative is not None else None
+                ),
+                sources=result_b.sources,
+                notes=result_b.rationale,
+                confidence=0.0,
+                duration_ms=result_b.duration_ms,
+            ))
+            new_status = status_after_validator_b(result_b.final_status)
+
+        status_map = dict(entity.field_status_map or {})
+        status_map[field_name] = new_status
+        entity.field_status_map = status_map

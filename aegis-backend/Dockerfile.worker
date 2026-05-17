@@ -1,0 +1,22 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    libpq-dev gcc curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+RUN useradd -m -u 1000 aegis && chown -R aegis:aegis /app
+USER aegis
+
+# Runs Celery worker + beat scheduler in a single container.
+# In Railway: create a new service pointing to this Dockerfile.
+# Required env vars (same as pure-enthusiasm service):
+#   DATABASE_URL, REDIS_URL / CELERY_BROKER_URL, ANTHROPIC_API_KEY
+CMD ["celery", "-A", "app.workers.tasks.celery_app", "worker", \
+     "--beat", "--loglevel=info", "--concurrency=2"]
