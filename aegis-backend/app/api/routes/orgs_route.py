@@ -90,7 +90,13 @@ async def _seed_org_background(org_id: str, fingerprint: dict, frameworks: list,
     from app.seeding.completeness_loop import seed_org
     from app.database import get_db_context
     from uuid import UUID
+
+    # Phase 1: populate from fingerprint (commits internally)
     async with get_db_context() as db:
         await seed_org_from_fingerprint(org_id, fingerprint, db)
-        if company_name:
-            await seed_org(org_id=UUID(org_id), company_name=company_name, db=db)
+
+    # Phase 2: fill remaining empty fields via multi-strategy completeness loop
+    # Uses a fresh session because seed_org_from_fingerprint commits internally
+    if company_name:
+        async with get_db_context() as db:
+            await seed_org(UUID(org_id), company_name, db)
