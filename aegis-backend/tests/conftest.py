@@ -30,7 +30,7 @@ TEST_DB_URL = os.getenv(
 
 @pytest_asyncio.fixture(scope="function")
 async def db_engine():
-    from app.database import Base
+    from app.models import Base
     engine = create_async_engine(TEST_DB_URL, echo=False, future=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
