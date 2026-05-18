@@ -19,6 +19,10 @@ settings = get_settings()
 claude = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 
+def _slugify(name: str) -> str:
+    return name.lower().replace(",", "").replace(".", "").replace(" ", "_")[:40]
+
+
 @dataclass
 class StrategyResult:
     value: Any
@@ -55,8 +59,10 @@ async def run(company_name: str, field_name: str, field_label: str, context: dic
     type_hint = _FIELD_TYPE_HINTS.get(field_name, "")
     type_note = f"\nRequired format: {type_hint}" if type_hint else ""
 
+    _meta = f"# META: agent=seeder company={_slugify(company_name)} field={field_name}\n"
     system = (
-        "You are a data researcher. Use the web_search tool to find authoritative information "
+        _meta
+        + "You are a data researcher. Use the web_search tool to find authoritative information "
         "about a company, then extract the specific field requested.\n\n"
         "After searching, respond with ONLY a JSON object — no markdown, no preamble:\n"
         '{"value": <the extracted value or null>, '

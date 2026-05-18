@@ -1,0 +1,10 @@
+{
+  "confidence": 0.96,
+  "duration_ms": 1200,
+  "field": "annual_revenue_range",
+  "notes": "Synthesized fixture from golden values.",
+  "primary_source_url": "https://www.example.com/source",
+  "seeded_value": "10B-50B",
+  "verification_status": "verified",
+  "verified": true
+}

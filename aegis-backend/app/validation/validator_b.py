@@ -22,6 +22,10 @@ settings = get_settings()
 claude = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 
+def _slugify(name: str) -> str:
+    return name.lower().replace(",", "").replace(".", "").replace(" ", "_")[:40]
+
+
 @dataclass
 class ValidatorBResult:
     field_name: str
@@ -60,11 +64,13 @@ async def validate_field(
     t0 = time.monotonic()
 
     try:
+        _meta = f"# META: agent=validator_b company={_slugify(company_name)} field={field_name}\n"
         response = await claude.messages.create(
             model="claude-opus-4-7",
             max_tokens=700,
             system=(
-                f"You are Validator B, an adversarial fact-checker ({mode}).\n"
+                _meta
+                + f"You are Validator B, an adversarial fact-checker ({mode}).\n"
                 f"{SEARCH_GUIDANCE_B}\n\n"
                 "Actively look for evidence that contradicts the seeded value. "
                 "If this is a QA sample, verify the value even if A already verified it.\n"
