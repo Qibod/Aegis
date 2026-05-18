@@ -58,14 +58,21 @@ async def validate_org(org_id: UUID, company_name: str, db: AsyncSession) -> dic
                 value = getattr(entity, spec.name, None)
                 sources = (entity.field_source_map or {}).get(spec.name, [])
 
-                result_a = await validator_a.validate_field(
-                    company_name=company_name,
-                    entity_type=entity_type,
-                    field_name=spec.name,
-                    field_label=spec.label,
-                    seeded_value=value,
-                    source_urls=sources,
-                )
+                try:
+                    result_a = await validator_a.validate_field(
+                        company_name=company_name,
+                        entity_type=entity_type,
+                        field_name=spec.name,
+                        field_label=spec.label,
+                        seeded_value=value,
+                        source_urls=sources,
+                    )
+                except Exception:
+                    logger.exception(
+                        "validator_a failed for %s.%s on entity %s — skipping field",
+                        entity_type, spec.name, entity.id,
+                    )
+                    continue
 
                 fv_a = FieldValidation(
                     org_id=org_id,
@@ -90,15 +97,24 @@ async def validate_org(org_id: UUID, company_name: str, db: AsyncSession) -> dic
 
                 if run_b:
                     is_qa = result_a.verification_status == "verified"
-                    result_b = await validator_b.validate_field(
-                        company_name=company_name,
-                        entity_type=entity_type,
-                        field_name=spec.name,
-                        field_label=spec.label,
-                        seeded_value=value,
-                        validator_a_result=result_a,
-                        is_qa_sample=is_qa,
-                    )
+                    try:
+                        result_b = await validator_b.validate_field(
+                            company_name=company_name,
+                            entity_type=entity_type,
+                            field_name=spec.name,
+                            field_label=spec.label,
+                            seeded_value=value,
+                            validator_a_result=result_a,
+                            is_qa_sample=is_qa,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "validator_b failed for %s.%s on entity %s — keeping A result",
+                            entity_type, spec.name, entity.id,
+                        )
+                        status_map[spec.name] = new_status
+                        counts[new_status if new_status in counts else "unverifiable"] += 1
+                        continue
                     fv_b = FieldValidation(
                         org_id=org_id,
                         entity_type=entity_type,

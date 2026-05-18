@@ -484,6 +484,9 @@ class OrgProfileResponse(AegisBase):
     updated_by: UUID | None = None
     created_at: datetime
     updated_at: datetime
+    field_status_map: dict[str, str] = Field(default_factory=dict)
+    field_confidence_map: dict[str, float] = Field(default_factory=dict)
+    field_source_map: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class OrgProfileCreate(BaseModel):
@@ -525,6 +528,9 @@ class LOBResponse(AegisBase):
     is_primary: bool
     created_at: datetime
     updated_at: datetime
+    field_status_map: dict[str, str] = Field(default_factory=dict)
+    field_confidence_map: dict[str, float] = Field(default_factory=dict)
+    field_source_map: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class LOBCreate(BaseModel):
@@ -555,6 +561,9 @@ class GeographyResponse(AegisBase):
     lob_ids: list[str] = []
     regulatory_flags: list[str] = []
     created_at: datetime
+    field_status_map: dict[str, str] = Field(default_factory=dict)
+    field_confidence_map: dict[str, float] = Field(default_factory=dict)
+    field_source_map: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class GeographyCreate(BaseModel):
@@ -573,6 +582,9 @@ class IndustryResponse(AegisBase):
     classification: str
     lob_ids: list[str] = []
     created_at: datetime
+    field_status_map: dict[str, str] = Field(default_factory=dict)
+    field_confidence_map: dict[str, float] = Field(default_factory=dict)
+    field_source_map: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class IndustryCreate(BaseModel):
@@ -596,6 +608,9 @@ class ProductResponse(AegisBase):
     data_sensitivity: str
     created_at: datetime
     updated_at: datetime
+    field_status_map: dict[str, str] = Field(default_factory=dict)
+    field_confidence_map: dict[str, float] = Field(default_factory=dict)
+    field_source_map: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class ProductCreate(BaseModel):
@@ -634,6 +649,9 @@ class SegmentResponse(AegisBase):
     lob_ids: list[str] = []
     estimated_size: str | None = None
     created_at: datetime
+    field_status_map: dict[str, str] = Field(default_factory=dict)
+    field_confidence_map: dict[str, float] = Field(default_factory=dict)
+    field_source_map: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class SegmentCreate(BaseModel):
@@ -658,6 +676,9 @@ class ThirdPartyResponse(AegisBase):
     last_assessed: str | None = None
     assessment_status: str
     created_at: datetime
+    field_status_map: dict[str, str] = Field(default_factory=dict)
+    field_confidence_map: dict[str, float] = Field(default_factory=dict)
+    field_source_map: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class ThirdPartyCreate(BaseModel):
@@ -695,6 +716,9 @@ class DataTechResponse(AegisBase):
     core_tech_stack: list[str] = []
     created_at: datetime
     updated_at: datetime
+    field_status_map: dict[str, str] = Field(default_factory=dict)
+    field_confidence_map: dict[str, float] = Field(default_factory=dict)
+    field_source_map: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class DataTechUpdate(BaseModel):
