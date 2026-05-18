@@ -80,12 +80,17 @@ async def complete_onboarding(
         org_id=str(org_id),
         fingerprint=payload.fingerprint_data,
         frameworks=payload.selected_frameworks,
+        company_name=payload.fingerprint_data.get("company_name", org.name),
     )
     return org
 
 
-async def _seed_org_background(org_id: str, fingerprint: dict, frameworks: list):
+async def _seed_org_background(org_id: str, fingerprint: dict, frameworks: list, company_name: str = ""):
     from app.ai.fingerprint import seed_org_from_fingerprint
+    from app.seeding.completeness_loop import seed_org
     from app.database import get_db_context
+    from uuid import UUID
     async with get_db_context() as db:
         await seed_org_from_fingerprint(org_id, fingerprint, db)
+        if company_name:
+            await seed_org(org_id=UUID(org_id), company_name=company_name, db=db)
