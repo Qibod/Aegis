@@ -55,10 +55,10 @@ export const ChangeCard: React.FC<ChangeCardProps> = ({ proposal, onApprove, onR
 
       {!resolved ? (
         <div style={{ display: 'flex', gap: 6 }}>
-          <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={onReject}>
+          <button data-testid="change-card-reject" className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={onReject}>
             <X size={11} style={{ marginRight: 4 }} />Reject
           </button>
-          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={onApprove}>
+          <button data-testid="change-card-approve" className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={onApprove}>
             <Check size={11} style={{ marginRight: 4 }} />Approve
           </button>
         </div>

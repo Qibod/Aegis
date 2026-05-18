@@ -95,6 +95,8 @@ export const VerificationTick: React.FC<VerificationTickProps> = ({
 
   if (tickState === 'empty') return null
 
+  const testId = `field-tick-${fieldName}`
+
   const icon = (() => {
     switch (tickState) {
       case 'verified':
@@ -145,17 +147,26 @@ export const VerificationTick: React.FC<VerificationTickProps> = ({
   const validatedAt = sourceValidator?.validated_at
 
   return (
-    <span ref={ref} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 4, cursor: 'pointer', verticalAlign: 'middle' }}
-      onClick={() => setOpen(o => !o)}>
+    <span
+      ref={ref}
+      data-testid={testId}
+      data-state={tickState}
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 4, cursor: 'pointer', verticalAlign: 'middle' }}
+      onClick={() => setOpen(o => !o)}
+    >
       {icon}
 
       {open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, zIndex: 200,
-          background: 'var(--bg1)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: 12, width: 260, marginTop: 4,
-          boxShadow: '0 4px 16px rgba(0,0,0,.4)',
-        }} onClick={e => e.stopPropagation()}>
+        <div
+          data-testid="tick-popover"
+          style={{
+            position: 'absolute', top: '100%', left: 0, zIndex: 200,
+            background: 'var(--bg1)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: 12, width: 260, marginTop: 4,
+            boxShadow: '0 4px 16px rgba(0,0,0,.4)',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
           <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text2)' }}>
             Verification status
           </div>

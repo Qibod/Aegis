@@ -68,10 +68,14 @@ export const DisputedFieldModal: React.FC<DisputedFieldModalProps> = ({
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 500,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }} onClick={onClose}>
+    <div
+      data-testid="disputed-modal"
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 500,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+      onClick={onClose}
+    >
       <div className="card animate-fade" style={{ width: 520, padding: 0 }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 14, fontWeight: 500 }}>Resolve disputed field</div>
@@ -127,7 +131,7 @@ export const DisputedFieldModal: React.FC<DisputedFieldModalProps> = ({
 
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn btn-primary btn-sm" onClick={handleResolve} disabled={saving}>
+          <button data-testid="disputed-apply" className="btn btn-primary btn-sm" onClick={handleResolve} disabled={saving}>
             {saving ? <Spinner size={12} /> : 'Apply resolution'}
           </button>
         </div>
@@ -143,6 +147,7 @@ const OptionCard: React.FC<{
   children?: React.ReactNode
 }> = ({ id, selected, onSelect, label, description, confidence, recommended, children }) => (
   <div
+    data-testid={`disputed-option-${id}`}
     onClick={onSelect}
     style={{
       padding: '10px 12px', borderRadius: 8, cursor: 'pointer',

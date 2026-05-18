@@ -69,6 +69,7 @@ export const GRCAssistant: React.FC = () => {
     <>
       {/* Toggle button — always visible */}
       <button
+        data-testid="assistant-toggle"
         onClick={toggleOpen}
         title="GRC Assistant (⌘K)"
         style={{
@@ -143,11 +144,20 @@ export const GRCAssistant: React.FC = () => {
           <div ref={bottomRef} />
         </div>
 
+        {/* Session reset banner — always shown per PRD §3.5.6 */}
+        <div
+          data-testid="assistant-session-banner"
+          style={{ padding: '4px 14px', fontSize: 9, color: 'var(--text3)', borderTop: '1px solid var(--border)', textAlign: 'center' }}
+        >
+          Conversations reset between sessions. I won't remember our previous chats.
+        </div>
+
         {/* Input */}
         <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
             <textarea
               ref={inputRef}
+              data-testid="assistant-input"
               rows={2}
               className="input"
               style={{ flex: 1, resize: 'none', fontSize: 12, padding: '6px 9px', lineHeight: 1.4 }}
@@ -158,6 +168,7 @@ export const GRCAssistant: React.FC = () => {
               disabled={!isConnected}
             />
             <button
+              data-testid="assistant-send"
               className="btn btn-primary btn-sm"
               onClick={submit}
               disabled={!draft.trim() || !isConnected}
@@ -178,7 +189,7 @@ export const GRCAssistant: React.FC = () => {
 const MessageBubble: React.FC<{ message: AssistantMessage }> = ({ message }) => {
   const isUser = message.role === 'user'
   return (
-    <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+    <div data-testid={`assistant-message-${message.role}`} style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
       <div style={{
         maxWidth: '85%', padding: '7px 10px', borderRadius: isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
         background: isUser ? 'var(--accent)' : 'var(--bg2)',
