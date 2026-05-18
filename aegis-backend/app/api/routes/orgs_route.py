@@ -80,6 +80,16 @@ async def complete_onboarding(
 
 async def _seed_org_background(org_id: str, fingerprint: dict, frameworks: list):
     from app.ai.fingerprint import seed_org_from_fingerprint
+    from app.seeding.completeness_loop import seed_org
     from app.database import get_db_context
+    from uuid import UUID
+
+    # Phase 1: populate from fingerprint (commits internally)
     async with get_db_context() as db:
         await seed_org_from_fingerprint(org_id, fingerprint, db)
+
+    # Phase 2: fill remaining empty fields via multi-strategy completeness loop
+    company_name = fingerprint.get("company_name", "")
+    if company_name:
+        async with get_db_context() as db:
+            await seed_org(UUID(org_id), company_name, db)

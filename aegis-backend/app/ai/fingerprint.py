@@ -750,7 +750,7 @@ async def seed_org_from_fingerprint(
     from sqlalchemy import select as sa_select
     from app.models import (
         OrgProfile, LineOfBusiness, OrgGeography, OrgIndustry,
-        CustomerSegment, DataTechProfile,
+        CustomerSegment, DataTechProfile, OrgProduct, ThirdPartyDependency,
     )
 
     _J2ISO = {
@@ -838,6 +838,48 @@ async def seed_org_from_fingerprint(
     domains_lower = " ".join(
         d.get("name", "") for d in fingerprint.get("risk_domains", [])
     ).lower()
+
+    # Products — one stub per business line; completeness loop fills remaining fields
+    for i, bl in enumerate(fingerprint.get("business_lines", [])[:8]):
+        product_name = bl.split("(")[0].strip()[:255]
+        is_platform = any(kw in bl.lower() for kw in ("platform", "marketplace", "app", "portal"))
+        is_service = any(kw in bl.lower() for kw in ("service", "consulting", "advisory", "support"))
+        product_type = "platform" if is_platform else ("service" if is_service else "product")
+        sensitivity = "high" if any(kw in regs_lower for kw in ("pci", "hipaa", "phi")) else "medium"
+        db.add(OrgProduct(
+            org_id=org_uuid,
+            name=product_name,
+            product_type=product_type,
+            status="live",
+            data_sensitivity=sensitivity,
+        ))
+    if fingerprint.get("business_lines"):
+        await db.flush()
+
+    # Third-party dependencies — inferred from regulatory/domain signals
+    tp_added = 0
+    if any(kw in regs_lower for kw in ("pci", "payment", "psd")):
+        db.add(ThirdPartyDependency(
+            org_id=org_uuid, name="Payment Processor", category="payment_processor", tier="tier_1",
+        ))
+        tp_added += 1
+    if any(kw in domains_lower for kw in ("cloud", "technology", "platform", "resilience")):
+        db.add(ThirdPartyDependency(
+            org_id=org_uuid, name="Cloud Infrastructure Provider", category="cloud_provider", tier="tier_1",
+        ))
+        tp_added += 1
+    if any(kw in regs_lower for kw in ("gdpr", "ccpa", "privacy", "data protection")):
+        db.add(ThirdPartyDependency(
+            org_id=org_uuid, name="Data Analytics Vendor", category="analytics_vendor", tier="tier_2",
+        ))
+        tp_added += 1
+    if tp_added == 0:
+        # Ensure at least one row exists so the completeness loop can refine it
+        db.add(ThirdPartyDependency(
+            org_id=org_uuid, name="Core Technology Vendor", category="saas_vendor", tier="tier_1",
+        ))
+    await db.flush()
+
     db.add(DataTechProfile(
         org_id=org_uuid,
         handles_personal_data=any(kw in regs_lower for kw in ("gdpr", "ccpa", "privacy", "data protection")),
