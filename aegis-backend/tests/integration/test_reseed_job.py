@@ -32,14 +32,29 @@ def test_TC_R_01_beat_schedule_contains_reseed():
 
 # ── TC-R-02: Critical ─────────────────────────────────────────────────────────
 @pytest.mark.asyncio
-async def test_TC_R_02_iterates_only_unknown_fields(db, monkeypatch):
+async def test_TC_R_02_iterates_only_unknown_fields(db, db_engine, monkeypatch):
     """Re-seed only attempts fields with field_status='unknown'.
 
     Non-unknown fields must not be mutated by the reseed pass.
     Avoids calling the real Claude seeder by mocking seed_field directly.
+    get_db_context is patched to use the test engine so _reseed_async
+    shares the same event loop as the test.
     """
+    import contextlib
+    import app.database as _db_module
     import app.seeding.completeness_loop as _cl
     from app.seeding.completeness_loop import SeedResult
+    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+
+    # Route _reseed_async's sessions through the test engine (same event loop)
+    _TestSession = async_sessionmaker(db_engine, expire_on_commit=False, class_=AsyncSession)
+
+    @contextlib.asynccontextmanager
+    async def _test_db_context():
+        async with _TestSession() as session:
+            yield session
+
+    monkeypatch.setattr(_db_module, "get_db_context", _test_db_context)
 
     # Mock seed_field so reseed never calls real Claude
     async def _mock_seed_field(*args, **kwargs):
@@ -81,10 +96,22 @@ async def test_TC_R_02_iterates_only_unknown_fields(db, monkeypatch):
 
 # ── TC-R-03: Critical ─────────────────────────────────────────────────────────
 @pytest.mark.asyncio
-async def test_TC_R_03_writes_proposals_not_values(db, monkeypatch):
+async def test_TC_R_03_writes_proposals_not_values(db, db_engine, monkeypatch):
     """Successful re-seed creates SeedingProposal rows; does NOT mutate the entity directly."""
+    import contextlib
+    import app.database as _db_module
     import app.seeding.completeness_loop as _cl
     from app.seeding.completeness_loop import SeedResult
+    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+
+    _TestSession = async_sessionmaker(db_engine, expire_on_commit=False, class_=AsyncSession)
+
+    @contextlib.asynccontextmanager
+    async def _test_db_context():
+        async with _TestSession() as session:
+            yield session
+
+    monkeypatch.setattr(_db_module, "get_db_context", _test_db_context)
 
     async def _mock_seed_field(*args, **kwargs):
         return SeedResult(status="seeded", value="Mocked City", confidence=0.9, source_urls=[])
