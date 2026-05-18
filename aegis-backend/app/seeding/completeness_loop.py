@@ -117,7 +117,8 @@ async def seed_org(org_id: UUID, company_name: str, db: AsyncSession) -> dict[st
     context = _build_context(profile)
     counts = {"seeded": 0, "unknown": 0}
 
-    # Seed OrgProfile fields
+    # Seed OrgProfile fields — update context after each success so that
+    # site_scrape can use newly-seeded values (e.g. website) for later fields.
     for spec in FIELD_SPECS.get("org_profiles", []):
         current_val = getattr(profile, spec.name, None)
         if current_val is not None and current_val != "" and current_val != [] and current_val != {}:
@@ -125,6 +126,8 @@ async def seed_org(org_id: UUID, company_name: str, db: AsyncSession) -> dict[st
 
         result = await seed_field(spec, company_name, context, db, org_id, "org_profiles", profile.id)
         _apply_result(profile, spec.name, result)
+        if result.status == "seeded":
+            _update_context(context, spec.name, result.value)
         counts[result.status] += 1
 
     await db.flush()
@@ -179,18 +182,62 @@ async def seed_org(org_id: UUID, company_name: str, db: AsyncSession) -> dict[st
 
 def _build_context(profile: OrgProfile) -> dict:
     return {
-        "legal_name":    profile.legal_name,
-        "website":       profile.website,
-        "hq_country":    profile.hq_country,
-        "stock_ticker":  profile.stock_ticker,
-        "description":   profile.description,
+        "legal_name":        profile.legal_name,
+        "trading_name":      getattr(profile, "trading_name", None),
+        "website":           profile.website,
+        "hq_country":        profile.hq_country,
+        "hq_city":           getattr(profile, "hq_city", None),
+        "stock_ticker":      profile.stock_ticker,
+        "description":       profile.description,
+        "year_founded":      getattr(profile, "year_founded", None),
+        "employee_range":    getattr(profile, "employee_range", None),
         "is_public_company": bool(profile.stock_ticker),
     }
 
 
+def _update_context(context: dict, field_name: str, value: Any) -> None:
+    """Propagate a freshly-seeded value into the shared context dict.
+
+    This ensures subsequent strategies (especially site_scrape which needs
+    website) see values populated earlier in the same seed_org pass.
+    """
+    _CONTEXT_FIELDS = {
+        "legal_name", "trading_name", "website", "hq_country", "hq_city",
+        "stock_ticker", "description", "year_founded", "employee_range",
+    }
+    if field_name in _CONTEXT_FIELDS:
+        context[field_name] = value
+    if field_name == "stock_ticker":
+        context["is_public_company"] = bool(value)
+
+
+_BOOL_FIELDS = {
+    "uses_ai_ml", "handles_personal_data", "handles_sensitive_personal_data",
+    "handles_payment_data", "handles_health_data", "handles_classified_data",
+    "is_primary", "includes_minors", "includes_healthcare", "includes_financial",
+}
+_INT_FIELDS = {"year_founded"}
+
+
+def _coerce_value(field_name: str, value: Any) -> Any:
+    """Ensure the seeded value matches the expected column type."""
+    if value is None:
+        return None
+    if field_name in _BOOL_FIELDS:
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() in ("true", "1", "yes")
+    if field_name in _INT_FIELDS:
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return value
+    return value
+
+
 def _apply_result(entity: Any, field_name: str, result: SeedResult) -> None:
     if result.status == "seeded":
-        setattr(entity, field_name, result.value)
+        setattr(entity, field_name, _coerce_value(field_name, result.value))
     status_map = entity.field_status_map or {}
     confidence_map = entity.field_confidence_map or {}
     source_map = entity.field_source_map or {}
