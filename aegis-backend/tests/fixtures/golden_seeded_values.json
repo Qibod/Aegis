@@ -1,0 +1,35 @@
+{
+  "uber": {
+    "org_profile": {
+      "legal_name": "Uber Technologies, Inc.",
+      "hq_country": "US",
+      "hq_city": "San Francisco",
+      "stock_ticker": "UBER",
+      "year_founded": 2009,
+      "website": "https://www.uber.com",
+      "employee_range": "10000+",
+      "annual_revenue_range": "10B-50B"
+    },
+    "data_tech": {
+      "uses_ai_ml": true,
+      "handles_personal_data": true,
+      "handles_payment_data": true
+    },
+    "industries": {
+      "primary_code_prefix": "5411"
+    }
+  },
+  "stripe": {
+    "org_profile": {
+      "legal_name": "Stripe, Inc.",
+      "hq_country": "US",
+      "hq_city": "South San Francisco",
+      "year_founded": 2010,
+      "website": "https://stripe.com"
+    },
+    "data_tech": {
+      "handles_payment_data": true,
+      "handles_personal_data": true
+    }
+  }
+}

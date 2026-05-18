@@ -1,0 +1,61 @@
+{
+  "uber": {
+    "company_name": "Uber Technologies, Inc.",
+    "domain": "uber.com",
+    "is_public_company": true,
+    "expected": {
+      "legal_name": "Uber Technologies, Inc.",
+      "hq_country": "US",
+      "hq_city": "San Francisco",
+      "stock_ticker": "UBER",
+      "year_founded": 2009,
+      "primary_industry_code_prefix": "5411",
+      "cloud_providers_includes": ["AWS"],
+      "min_lobs": 2,
+      "min_geographies": 3
+    }
+  },
+  "stripe": {
+    "company_name": "Stripe, Inc.",
+    "domain": "stripe.com",
+    "is_public_company": false,
+    "expected": {
+      "legal_name": "Stripe, Inc.",
+      "hq_country": "US",
+      "hq_city": "South San Francisco",
+      "year_founded": 2010,
+      "handles_payment_data": true,
+      "min_lobs": 1
+    }
+  },
+  "anthropic": {
+    "company_name": "Anthropic PBC",
+    "domain": "anthropic.com",
+    "is_public_company": false,
+    "expected": {
+      "legal_name": "Anthropic PBC",
+      "hq_country": "US",
+      "uses_ai_ml": true,
+      "year_founded": 2021
+    }
+  },
+  "maersk": {
+    "company_name": "A.P. Moller-Maersk",
+    "domain": "maersk.com",
+    "is_public_company": true,
+    "expected": {
+      "legal_name": "A.P. Moller-Maersk A/S",
+      "hq_country": "DK",
+      "stock_ticker": "MAERSK-B"
+    }
+  },
+  "acme_shell_001": {
+    "company_name": "Acme Shell Holdings 001",
+    "domain": "acmeshell001.example.com",
+    "is_public_company": false,
+    "expected": {
+      "legal_name_known": false,
+      "expect_mostly_unknown": true
+    }
+  }
+}
