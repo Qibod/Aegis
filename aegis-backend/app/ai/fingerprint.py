@@ -42,7 +42,15 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
-claude = AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+_claude_client: AsyncAnthropic | None = None
+
+
+def _get_claude() -> AsyncAnthropic:
+    global _claude_client
+    if _claude_client is None:
+        _claude_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    return _claude_client
 
 
 # ── Jurisdiction knowledge base ───────────────────────────────────────────────
@@ -173,7 +181,7 @@ Rules:
 Company name: {name}"""
 
     try:
-        msg = await claude.messages.create(
+        msg = await _get_claude().messages.create(
             model=settings.claude_model,
             max_tokens=800,
             messages=[{"role": "user", "content": prompt}],
@@ -229,7 +237,7 @@ async def _resolve_jurisdiction(name: str) -> dict[str, str]:
 Return ONLY valid JSON: {{"jurisdiction": "United States", "regulator": "SEC / FTC"}}
 Use the primary financial regulator(s) for that country and industry. No other text."""
     try:
-        msg = await claude.messages.create(
+        msg = await _get_claude().messages.create(
             model=settings.claude_model,
             max_tokens=100,
             messages=[{"role": "user", "content": prompt}],
@@ -457,7 +465,7 @@ Generate output specific to {name}. Cover every business line. Use industry-corr
 Scale the number of items to company size: enterprise = 8-12 processes, 7-9 domains, 8-12 regs, 5-7 frameworks, 8-12 risks, 5-7 controls."""
 
     try:
-        msg = await claude.messages.create(
+        msg = await _get_claude().messages.create(
             model=settings.claude_model,
             max_tokens=8000,
             messages=[{"role": "user", "content": prompt}],
@@ -519,23 +527,23 @@ async def fingerprint_company(
     return {
         # Identity
         "company_name": name,
-        "jurisdiction": jurisdiction_info.get("jurisdiction", "Unknown"),
-        "regulator": jurisdiction_info.get("regulator", ""),
-        "industry_label": grc.get("industry_label", decomposition.get("sector", "Unknown")),
-        "industry_code": grc.get("sic_code"),
-        "org_type": decomposition.get("org_type", "for-profit"),
-        "employee_range": decomposition.get("employee_scale", ""),  # schema expects employee_range
+        "jurisdiction": jurisdiction_info.get("jurisdiction") or "Unknown",
+        "regulator": jurisdiction_info.get("regulator") or "",
+        "industry_label": grc.get("industry_label") or decomposition.get("sector") or "Unknown",
+        "industry_code": grc.get("sic_code") or None,
+        "org_type": decomposition.get("org_type") or "for-profit",
+        "employee_range": decomposition.get("employee_scale") or "",
         # Business decomposition
-        "business_lines": decomposition.get("business_lines", []),
-        "customer_types": decomposition.get("customer_types", []),
-        "business_summary": decomposition.get("summary", ""),
+        "business_lines": decomposition.get("business_lines") or [],
+        "customer_types": decomposition.get("customer_types") or [],
+        "business_summary": decomposition.get("summary") or "",
         # GRC output
-        "detected_processes": grc.get("detected_processes", []),
-        "risk_domains": grc.get("risk_domains", []),
-        "detected_regulations": grc.get("detected_regulations", []),
-        "suggested_frameworks": grc.get("suggested_frameworks", []),
-        "risks": grc.get("risks", []),
-        "controls": grc.get("controls", []),
+        "detected_processes": grc.get("detected_processes") or [],
+        "risk_domains": grc.get("risk_domains") or [],
+        "detected_regulations": grc.get("detected_regulations") or [],
+        "suggested_frameworks": grc.get("suggested_frameworks") or [],
+        "risks": grc.get("risks") or [],
+        "controls": grc.get("controls") or [],
         # Meta
         "confidence_score": 0.9 if wiki_context else 0.8,
     }

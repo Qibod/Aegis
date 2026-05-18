@@ -1,10 +1,13 @@
 """app/api/routes/orgs_route.py — Organization management"""
+import logging
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+log = logging.getLogger(__name__)
 
 from app.ai.context import build_org_profile_context
 from app.api.auth import get_current_active_user, get_org_id
@@ -48,10 +51,13 @@ async def fingerprint(
     db: AsyncSession = Depends(get_db),
 ):
     from app.ai.fingerprint import fingerprint_company
-    # Use verified Company Profile as primary context if it already exists
-    org_context = await build_org_profile_context(org_id, db)
-    result = await fingerprint_company(payload.company_name, org_context)
-    return OrgFingerprintResponse(**result)
+    try:
+        org_context = await build_org_profile_context(org_id, db)
+        result = await fingerprint_company(payload.company_name, org_context)
+        return OrgFingerprintResponse(**result)
+    except Exception as exc:
+        log.error("fingerprint failed for %r: %s", payload.company_name, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Fingerprinting failed. Please try again.")
 
 
 @router.post("/complete-onboarding", response_model=OrgResponse)
@@ -74,11 +80,12 @@ async def complete_onboarding(
         org_id=str(org_id),
         fingerprint=payload.fingerprint_data,
         frameworks=payload.selected_frameworks,
+        company_name=payload.fingerprint_data.get("company_name", org.name),
     )
     return org
 
 
-async def _seed_org_background(org_id: str, fingerprint: dict, frameworks: list):
+async def _seed_org_background(org_id: str, fingerprint: dict, frameworks: list, company_name: str = ""):
     from app.ai.fingerprint import seed_org_from_fingerprint
     from app.seeding.completeness_loop import seed_org
     from app.database import get_db_context
@@ -89,7 +96,7 @@ async def _seed_org_background(org_id: str, fingerprint: dict, frameworks: list)
         await seed_org_from_fingerprint(org_id, fingerprint, db)
 
     # Phase 2: fill remaining empty fields via multi-strategy completeness loop
-    company_name = fingerprint.get("company_name", "")
+    # Uses a fresh session because seed_org_from_fingerprint commits internally
     if company_name:
         async with get_db_context() as db:
             await seed_org(UUID(org_id), company_name, db)
