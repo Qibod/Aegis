@@ -55,12 +55,12 @@ const SectionCard: React.FC<{
         {editing ? (
           <>
             <button className="btn btn-ghost btn-sm" onClick={onCancel} disabled={saving}><X size={12} /></button>
-            <button className="btn btn-primary btn-sm" onClick={onSave} disabled={saving}>
+            <button data-testid={`${id}-save-btn`} className="btn btn-primary btn-sm" onClick={onSave} disabled={saving}>
               {saving ? <Spinner size={11} /> : <><Check size={12} style={{ marginRight: 4 }} />Save</>}
             </button>
           </>
         ) : (
-          <button className="btn btn-ghost btn-sm" onClick={onEdit}><Pencil size={12} style={{ marginRight: 4 }} />Edit</button>
+          <button data-testid={`${id}-edit-btn`} className="btn btn-ghost btn-sm" onClick={onEdit}><Pencil size={12} style={{ marginRight: 4 }} />Edit</button>
         )}
       </div>
     </div>
@@ -354,7 +354,7 @@ const IdentitySection: React.FC<SectionProps<OrgIdentity | null>> = ({ data, isA
       {editing ? (
         <div className="grid-2">
           {([['legal_name','Legal name'],['trading_name','Trading name'],['hq_country','HQ country (2-letter)'],['hq_city','HQ city'],['stock_ticker','Stock ticker'],['website','Website']] as [keyof OrgIdentity, string][]).map(([k, label]) => (
-            <Field key={k} label={label}><Inp value={(form[k] as string) ?? ''} onChange={f(k)} /></Field>
+            <Field key={k} label={label}><Inp data-testid={`field-input-${k}`} value={(form[k] as string) ?? ''} onChange={f(k)} /></Field>
           ))}
           <Field label="Employee range"><Sel opts={EMPLOYEE_RANGES} value={(form.employee_range as string) ?? ''} onChange={f('employee_range')} /></Field>
           <Field label="Annual revenue range"><Sel opts={REVENUE_RANGES} value={(form.annual_revenue_range as string) ?? ''} onChange={f('annual_revenue_range')} /></Field>

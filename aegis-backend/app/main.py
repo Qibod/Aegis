@@ -116,6 +116,11 @@ def create_app() -> FastAPI:
     app.include_router(assistant_router,     prefix=API_PREFIX)
     app.include_router(ws_router)  # WebSocket — no prefix
 
+    import os
+    if os.getenv("AEGIS_ENABLE_TEST_ENDPOINTS") == "1":
+        from app.api.routes.test_route import router as test_router
+        app.include_router(test_router, prefix=API_PREFIX)
+
     # ── Health check ───────────────────────────────────────────────────────
     @app.get("/health", tags=["meta"])
     async def health():
