@@ -1,0 +1,8 @@
+{
+  "confidence": 0.96,
+  "source_urls": [
+    "https://www.example.com/source"
+  ],
+  "strategy_used": "web_search",
+  "value": "San Francisco"
+}

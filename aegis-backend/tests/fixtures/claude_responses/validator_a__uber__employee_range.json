@@ -1,0 +1,10 @@
+{
+  "confidence": 0.96,
+  "duration_ms": 1200,
+  "field": "employee_range",
+  "notes": "Synthesized fixture from golden values.",
+  "primary_source_url": "https://www.example.com/source",
+  "seeded_value": "10000+",
+  "verification_status": "verified",
+  "verified": true
+}
