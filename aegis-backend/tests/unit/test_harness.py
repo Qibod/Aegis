@@ -13,6 +13,7 @@ async def test_async_runs():
     assert True
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_db_fixture_provides_session(db):
     from sqlalchemy import text
@@ -20,6 +21,7 @@ async def test_db_fixture_provides_session(db):
     assert result.scalar() == 1
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_http_client_serves_a_response(http_client):
     resp = await http_client.get("/health")

@@ -9,12 +9,12 @@ TC-R-06 and TC-R-07 use direct DB + HTTP harness to test approve/reject.
 from __future__ import annotations
 
 import pytest
+from uuid import uuid4
 from sqlalchemy import select
 
 from app.models import OrgProfile, SeedingProposal, Organization, User, UserRole
 from app.tasks.reseed_unknowns import _reseed_async
 from app.workers.tasks import celery_app
-from tests.integration._helpers import onboard_test_org
 
 
 # ── TC-R-01: Critical ─────────────────────────────────────────────────────────
@@ -32,86 +32,124 @@ def test_TC_R_01_beat_schedule_contains_reseed():
 
 # ── TC-R-02: Critical ─────────────────────────────────────────────────────────
 @pytest.mark.asyncio
-async def test_TC_R_02_iterates_only_unknown_fields(db, mock_claude, test_companies):
+async def test_TC_R_02_iterates_only_unknown_fields(db, monkeypatch):
     """Re-seed only attempts fields with field_status='unknown'.
 
     Non-unknown fields must not be mutated by the reseed pass.
+    Avoids calling the real Claude seeder by mocking seed_field directly.
     """
-    org = await onboard_test_org(db, "acme_shell_001", test_companies)
-    profile = (await db.execute(
-        select(OrgProfile).where(OrgProfile.org_id == org.id)
-    )).scalar_one_or_none()
+    import app.seeding.completeness_loop as _cl
+    from app.seeding.completeness_loop import SeedResult
 
-    # Snapshot pre-reseed values of any non-unknown fields
-    status_map = (profile.field_status_map or {}) if profile else {}
-    pre_values = {}
-    if profile:
-        for field_name, status in status_map.items():
-            if status != "unknown":
-                pre_values[field_name] = getattr(profile, field_name, None)
+    # Mock seed_field so reseed never calls real Claude
+    async def _mock_seed_field(*args, **kwargs):
+        return SeedResult(status="seeded", value="Mocked City", confidence=0.9, source_urls=[])
+    monkeypatch.setattr(_cl, "seed_field", _mock_seed_field)
+
+    # Setup: org with one seeded field (legal_name) and one unknown field (hq_city)
+    org = Organization(
+        name="Reseed TC-R02 Org",
+        slug=f"reseed-tc-r02-{uuid4().hex[:6]}",
+        onboarding_complete=True,
+    )
+    db.add(org)
+    await db.flush()
+
+    profile = OrgProfile(
+        org_id=org.id,
+        legal_name="Reseed TC-R02 Org",
+        field_status_map={"legal_name": "seeded", "hq_city": "unknown"},
+        field_confidence_map={},
+        field_source_map={},
+    )
+    db.add(profile)
+    await db.commit()
+
+    legal_name_before = profile.legal_name
 
     await _reseed_async(org.id)
+
+    # Re-fetch via the test session to see committed state from _reseed_async
     await db.refresh(profile)
 
-    # Non-unknown fields must be unchanged
-    for field_name, original_value in pre_values.items():
-        current_value = getattr(profile, field_name, None)
-        assert current_value == original_value, (
-            f"reseed mutated non-unknown field {field_name!r}: "
-            f"{original_value!r} → {current_value!r}"
-        )
+    # Non-unknown field must be unchanged by the reseed pass
+    assert profile.legal_name == legal_name_before, (
+        f"reseed mutated non-unknown field legal_name: "
+        f"{legal_name_before!r} → {profile.legal_name!r}"
+    )
 
 
 # ── TC-R-03: Critical ─────────────────────────────────────────────────────────
 @pytest.mark.asyncio
-async def test_TC_R_03_writes_proposals_not_values(db, mock_claude, test_companies):
+async def test_TC_R_03_writes_proposals_not_values(db, monkeypatch):
     """Successful re-seed creates SeedingProposal rows; does NOT mutate the entity directly."""
-    org = await onboard_test_org(db, "acme_shell_001", test_companies)
-    profile = (await db.execute(
-        select(OrgProfile).where(OrgProfile.org_id == org.id)
-    )).scalar_one_or_none()
+    import app.seeding.completeness_loop as _cl
+    from app.seeding.completeness_loop import SeedResult
 
-    # Snapshot current values
-    legal_name_before = profile.legal_name if profile else None
+    async def _mock_seed_field(*args, **kwargs):
+        return SeedResult(status="seeded", value="Mocked City", confidence=0.9, source_urls=[])
+    monkeypatch.setattr(_cl, "seed_field", _mock_seed_field)
+
+    # Setup: org with one unknown field
+    org = Organization(
+        name="Reseed TC-R03 Org",
+        slug=f"reseed-tc-r03-{uuid4().hex[:6]}",
+        onboarding_complete=True,
+    )
+    db.add(org)
+    await db.flush()
+
+    profile = OrgProfile(
+        org_id=org.id,
+        legal_name="Reseed TC-R03 Org",
+        field_status_map={"hq_city": "unknown"},
+        field_confidence_map={},
+        field_source_map={},
+    )
+    db.add(profile)
+    await db.commit()
+
+    legal_name_before = profile.legal_name
 
     await _reseed_async(org.id)
 
-    if profile:
-        await db.refresh(profile)
-        assert profile.legal_name == legal_name_before, (
-            "reseed silently mutated `legal_name` on the entity — must use proposals instead"
-        )
+    await db.refresh(profile)
 
-    # Invariant: if mock returns a "seeded" result, a SeedingProposal row is created;
-    # if mock returns "unknown" again, no proposals (both are valid per the mock contract).
+    # Field value must NOT be mutated — reseed creates proposals instead
+    assert profile.legal_name == legal_name_before, (
+        "reseed silently mutated legal_name on the entity — must use proposals instead"
+    )
+    assert profile.hq_city is None, (
+        "reseed silently wrote hq_city — must create a proposal instead"
+    )
+
+    # A SeedingProposal row should exist and be pending
     proposals = (await db.execute(
         select(SeedingProposal).where(SeedingProposal.org_id == org.id)
     )).scalars().all()
-    assert isinstance(proposals, list), "expected a list of SeedingProposal rows"
+    assert len(proposals) > 0, "expected at least one SeedingProposal row after reseed"
     for p in proposals:
         assert p.status == "pending", f"new proposal should be 'pending', got {p.status!r}"
 
 
 # ── TC-R-04: High ─────────────────────────────────────────────────────────────
 @pytest.mark.asyncio
-async def test_TC_R_04_admin_notification_created(db, mock_claude, test_companies):
+async def test_TC_R_04_admin_notification_created(db):
     """An in-app notification is sent to org admins when new proposals are created."""
     pytest.skip("Pending: notifications module wiring not yet verified")
 
 
 # ── TC-R-05: High ─────────────────────────────────────────────────────────────
 @pytest.mark.asyncio
-async def test_TC_R_05_badge_count_via_api(db, mock_claude, test_companies, http_client):
+async def test_TC_R_05_badge_count_via_api(db, http_client):
     """Sidebar badge count (via API) matches pending proposal count."""
     pytest.skip("Pending: confirm pending-proposals-count endpoint path")
 
 
 # ── TC-R-06: Critical ─────────────────────────────────────────────────────────
 @pytest.mark.asyncio
-async def test_TC_R_06_approve_proposal_writes_value(db, mock_claude, test_companies, http_client):
+async def test_TC_R_06_approve_proposal_writes_value(db, http_client):
     """Approving a proposal writes the field value to the entity and enqueues validation."""
-    from uuid import uuid4
-    from datetime import datetime, timezone
     from app.api.auth import create_access_token
 
     # ── Setup: org + admin user + profile with unknown field ──────────────────
@@ -179,9 +217,8 @@ async def test_TC_R_06_approve_proposal_writes_value(db, mock_claude, test_compa
 
 # ── TC-R-07: Critical ─────────────────────────────────────────────────────────
 @pytest.mark.asyncio
-async def test_TC_R_07_reject_proposal_keeps_field_unknown(db, mock_claude, test_companies, http_client):
+async def test_TC_R_07_reject_proposal_keeps_field_unknown(db, http_client):
     """Rejecting a proposal keeps the field at 'unknown' and logs the rejection."""
-    from uuid import uuid4
     from app.api.auth import create_access_token
 
     # ── Setup ──────────────────────────────────────────────────────────────────

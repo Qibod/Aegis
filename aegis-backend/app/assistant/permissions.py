@@ -14,7 +14,7 @@ def require_read(user: User) -> None:
 
 def require_propose_change(user: User, entity_type: str) -> None:
     """Admin can propose any change. Auditor can only propose third-party changes."""
-    if user.role == "admin":
+    if user.role in ("org_admin", "head_of_audit"):
         return
     if user.role == "auditor" and entity_type == "org_third_parties":
         return
@@ -27,10 +27,10 @@ def require_apply_change(user: User, entity_type: str) -> None:
 
 
 def require_resolve_flagged(user: User) -> None:
-    if user.role != "admin":
+    if user.role not in ("org_admin", "head_of_audit"):
         raise HTTPException(403, "Only admins can resolve flagged fields")
 
 
 def require_approve_proposal(user: User) -> None:
-    if user.role != "admin":
+    if user.role not in ("org_admin", "head_of_audit"):
         raise HTTPException(403, "Only admins can approve re-seed proposals")
