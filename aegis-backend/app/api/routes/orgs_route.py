@@ -88,6 +88,7 @@ async def complete_onboarding(
 async def _seed_org_background(org_id: str, fingerprint: dict, frameworks: list, company_name: str = ""):
     from app.ai.fingerprint import seed_org_from_fingerprint
     from app.seeding.completeness_loop import seed_org
+    from app.validation.orchestrator import validate_org
     from app.database import get_db_context
     from uuid import UUID
 
@@ -100,3 +101,10 @@ async def _seed_org_background(org_id: str, fingerprint: dict, frameworks: list,
     if company_name:
         async with get_db_context() as db:
             await seed_org(UUID(org_id), company_name, db)
+
+        # Phase 3: validate every newly-seeded field (Validator A → optional B).
+        async with get_db_context() as db:
+            try:
+                await validate_org(UUID(org_id), company_name, db)
+            except Exception:
+                log.exception("validation pass failed for org_id=%s", org_id)
