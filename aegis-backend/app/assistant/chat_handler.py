@@ -31,8 +31,6 @@ async def handle_ws(
     db: AsyncSession,
 ):
     """Main WS handler. Maintains one Claude session per connection."""
-    await websocket.accept()
-
     session_id = session_store.create_session(user_id)
     await websocket.send_json({
         "type": "session_start",
@@ -89,7 +87,7 @@ async def handle_ws(
     except Exception as exc:
         logger.error("assistant WS error: %s", exc, exc_info=True)
         try:
-            await websocket.send_json({"type": "error", "message": "Internal error. Please try again."})
+            await websocket.send_json({"type": "error", "detail": "Internal error. Please try again."})
         except Exception:
             pass
 
@@ -120,7 +118,7 @@ async def _run_tool_loop(
 
         if text_parts:
             text = "\n".join(text_parts)
-            await websocket.send_json({"type": "message", "content": text})
+            await websocket.send_json({"type": "assistant_message", "content": text})
 
         if not tool_uses:
             return "\n".join(text_parts)
@@ -139,7 +137,7 @@ async def _run_tool_loop(
 
             # Emit tool result event for change proposals
             if tool_use.name == "propose_profile_change" and "change_id" in result:
-                await websocket.send_json({"type": "change_proposal", "proposal": result})
+                await websocket.send_json({"type": "change_proposal", **result})
 
             tool_results.append({
                 "type": "tool_result",

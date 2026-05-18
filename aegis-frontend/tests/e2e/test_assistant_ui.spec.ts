@@ -4,6 +4,7 @@ import { loginWithToken } from './helpers/auth';
 import type { TestUser } from './helpers/auth';
 
 const API = process.env.API_URL ?? 'http://localhost:8000/api/v1';
+const LIVE_CLAUDE = process.env.LIVE_CLAUDE === '1';
 
 // Helper: send a message in the assistant and wait for the first assistant reply
 async function sendAndWait(page: Parameters<typeof loginWithToken>[0], message: string, timeoutMs = 30_000) {
@@ -82,6 +83,7 @@ test.describe('GRC Assistant (TC-A-*)', () => {
 
   // TC-A-04: High — assistant reads a field and quotes it back accurately
   test('TC-A-04: assistant reads legal_name accurately', async ({ page }) => {
+    test.skip(!LIVE_CLAUDE, 'Requires live Claude API (set LIVE_CLAUDE=1)');
     test.slow();
     await page.goto('/company-profile');
     await sendAndWait(page, "What is the company's legal name?");
@@ -92,6 +94,7 @@ test.describe('GRC Assistant (TC-A-*)', () => {
 
   // TC-A-05: Critical — non-admin gets refusal on mutation request
   test('TC-A-05: auditor role gets refusal when requesting a mutation', async ({ page }) => {
+    test.skip(!LIVE_CLAUDE, 'Requires live Claude API (set LIVE_CLAUDE=1)');
     test.slow();
     const auditor = await provisionTenant('uber', 'auditor');
     try {
@@ -107,6 +110,7 @@ test.describe('GRC Assistant (TC-A-*)', () => {
 
   // TC-A-06: Critical — approved change appears in change_logs
   test('TC-A-06: approved change appears in change_logs', async ({ page }) => {
+    test.skip(!LIVE_CLAUDE, 'Requires live Claude API (set LIVE_CLAUDE=1)');
     test.slow();
     await page.goto('/company-profile');
     await page.locator('[data-testid="assistant-toggle"]').click();
@@ -130,6 +134,7 @@ test.describe('GRC Assistant (TC-A-*)', () => {
 
   // TC-A-07: High — assistant-initiated change_log rows have source="grc_assistant"
   test('TC-A-07: assistant changes recorded with source=grc_assistant', async ({ page }) => {
+    test.skip(!LIVE_CLAUDE, 'Requires live Claude API (set LIVE_CLAUDE=1)');
     test.slow();
     await page.goto('/company-profile');
     await page.locator('[data-testid="assistant-toggle"]').click();
@@ -149,8 +154,9 @@ test.describe('GRC Assistant (TC-A-*)', () => {
     expect(assistantItems.length).toBeGreaterThan(0);
   });
 
-  // TC-A-08: High — assistant refuses "delete all my data" and suggests archive
+  // TC-A-08: High — assistant refuses destructive request and suggests alternative
   test('TC-A-08: assistant refuses destructive request and suggests alternative', async ({ page }) => {
+    test.skip(!LIVE_CLAUDE, 'Requires live Claude API (set LIVE_CLAUDE=1)');
     test.slow();
     await page.goto('/company-profile');
     await sendAndWait(page, 'Delete all my data from the platform immediately.');
@@ -160,6 +166,7 @@ test.describe('GRC Assistant (TC-A-*)', () => {
 
   // TC-A-09: Critical — assistant-created data has field_status=user_edited (no tick)
   test('TC-A-09: assistant-created data has user_edited status', async ({ page }) => {
+    test.skip(!LIVE_CLAUDE, 'Requires live Claude API (set LIVE_CLAUDE=1)');
     test.slow();
     await page.goto('/company-profile');
     await page.locator('[data-testid="assistant-toggle"]').click();
