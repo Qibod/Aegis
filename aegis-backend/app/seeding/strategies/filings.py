@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 claude = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
+
+def _slugify(name: str) -> str:
+    return name.lower().replace(",", "").replace(".", "").replace(" ", "_")[:40]
+
 EDGAR_SEARCH = "https://efts.sec.gov/LATEST/search-index?q={query}&dateRange=custom&startdt=2023-01-01&forms=10-K,20-F"
 EDGAR_HEADERS = {"User-Agent": "Aegis-GRC contact@aegis.app"}
 
@@ -53,11 +57,13 @@ async def run(company_name: str, field_name: str, field_label: str, context: dic
 
     t0 = time.monotonic()
     try:
+        _meta = f"# META: agent=seeder company={_slugify(company_name)} field={field_name}\n"
         response = await claude.messages.create(
             model=settings.claude_model,
             max_tokens=400,
             system=(
-                "You are a financial data analyst. Extract a specific field value from SEC filing metadata. "
+                _meta
+                + "You are a financial data analyst. Extract a specific field value from SEC filing metadata. "
                 'Respond ONLY with JSON: {"value": <extracted value or null>, "confidence": <0.0-1.0>}'
             ),
             messages=[{

@@ -21,6 +21,10 @@ settings = get_settings()
 claude = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 
+def _slugify(name: str) -> str:
+    return name.lower().replace(",", "").replace(".", "").replace(" ", "_")[:40]
+
+
 @dataclass
 class ValidatorAResult:
     field_name: str
@@ -53,11 +57,13 @@ async def validate_field(
     t0 = time.monotonic()
 
     try:
+        _meta = f"# META: agent=validator_a company={_slugify(company_name)} field={field_name}\n"
         response = await claude.messages.create(
             model="claude-opus-4-7",
             max_tokens=600,
             system=(
-                f"You are Validator A, a rigorous fact-checker for GRC data.\n"
+                _meta
+                + f"You are Validator A, a rigorous fact-checker for GRC data.\n"
                 f"{SEARCH_GUIDANCE_A}\n\n"
                 "Verify whether the seeded value is accurate. Respond ONLY with JSON:\n"
                 '{"verified": <bool>, "verification_status": "verified"|"disputed"|"unverifiable", '

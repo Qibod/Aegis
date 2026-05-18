@@ -18,6 +18,10 @@ settings = get_settings()
 claude = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 
+def _slugify(name: str) -> str:
+    return name.lower().replace(",", "").replace(".", "").replace(" ", "_")[:40]
+
+
 _FIELD_TYPE_HINTS: dict[str, str] = {
     "hq_country":                      "ISO 3166-1 alpha-2 code (e.g. 'US', 'GB', 'NL')",
     "year_founded":                    "4-digit integer year (e.g. 2009)",
@@ -48,11 +52,13 @@ async def run(company_name: str, field_name: str, field_label: str, context: dic
 
     t0 = time.monotonic()
     try:
+        _meta = f"# META: agent=seeder company={_slugify(company_name)} field={field_name}\n"
         response = await claude.messages.create(
             model=settings.claude_model,
             max_tokens=400,
             system=(
-                "You are a GRC data analyst. Use the provided company context AND your training "
+                _meta
+                + "You are a GRC data analyst. Use the provided company context AND your training "
                 "knowledge to determine the requested field value.\n\n"
                 "Confidence guidelines:\n"
                 "- Use 0.95-0.97 ONLY when you are genuinely certain (e.g. this is a globally "
