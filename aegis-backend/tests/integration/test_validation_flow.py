@@ -120,3 +120,34 @@ async def test_TC_V_09_qa_sample_runs_b_on_5pct(db, mock_claude, test_companies)
 async def test_TC_V_10_qa_failure_triggers_batch_revalidation(db, mock_claude, test_companies):
     """If B disagrees with QA-sample A verdict, all of A's verified fields are re-validated."""
     pytest.skip("Pending QA-fail fixture set + batch-revalidation hook")
+
+
+# ── Live-Claude variants (nightly only) ───────────────────────────────────────
+
+@pytest.mark.needs_live_claude
+@pytest.mark.asyncio
+async def test_TC_V_05_LIVE(db, live_claude, test_companies):
+    """Real Claude: Uber key fields reach verified or verified_after_dispute."""
+    org = await onboard_test_org(db, "uber", test_companies)
+    profile = (await db.execute(select(OrgProfile).where(OrgProfile.org_id == org.id))).scalar_one()
+    status_map = profile.field_status_map or {}
+    for field in ("legal_name", "hq_country", "stock_ticker"):
+        assert status_map.get(field) in ("verified", "verified_after_dispute"), \
+            f"{field}: {status_map.get(field)!r}"
+
+
+@pytest.mark.needs_live_claude
+@pytest.mark.asyncio
+async def test_TC_V_07_LIVE(db, live_claude, test_companies):
+    """Real Claude: every verified A-row has ≥ 1 source URL."""
+    org = await onboard_test_org(db, "uber", test_companies)
+    rows = (await db.execute(
+        select(FieldValidation).where(
+            FieldValidation.org_id == org.id,
+            FieldValidation.validator == "A",
+            FieldValidation.status == "verified",
+        )
+    )).scalars().all()
+    for row in rows:
+        assert row.sources and len(row.sources) >= 1, \
+            f"{row.field_name} verified but no sources"

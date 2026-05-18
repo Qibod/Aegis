@@ -386,3 +386,38 @@ async def test_TC_O_24_onboarding_completes_within_180s(db, mock_claude, test_co
     await onboard_test_org(db, "uber", test_companies)
     elapsed = time.perf_counter() - start
     assert elapsed < 180, f"onboarding took {elapsed:.1f}s, expected < 180s"
+
+
+# ── Live-Claude variants (nightly only) ───────────────────────────────────────
+
+@pytest.mark.needs_live_claude
+@pytest.mark.asyncio
+async def test_TC_O_01_LIVE(db, live_claude, test_companies):
+    """Real Claude: ≥95% of Org Identity fields populated for Uber."""
+    org = await onboard_test_org(db, "uber", test_companies)
+    profile = (await db.execute(select(OrgProfile).where(OrgProfile.org_id == org.id))).scalar_one()
+    populated = sum(1 for f in REQUIRED_ORG_IDENTITY_FIELDS if getattr(profile, f, None) is not None)
+    completeness = populated / len(REQUIRED_ORG_IDENTITY_FIELDS)
+    assert completeness >= 0.95, f"only {completeness:.0%} populated"
+
+
+@pytest.mark.needs_live_claude
+@pytest.mark.asyncio
+async def test_TC_O_02_LIVE(db, live_claude, test_companies):
+    """Real Claude: Uber legal_name matches golden value (whitespace-normalised)."""
+    org = await onboard_test_org(db, "uber", test_companies)
+    profile = (await db.execute(select(OrgProfile).where(OrgProfile.org_id == org.id))).scalar_one()
+    expected = test_companies["uber"]["expected"]["legal_name"]
+    assert _norm(profile.legal_name) == _norm(expected)
+
+
+@pytest.mark.needs_live_claude
+@pytest.mark.asyncio
+async def test_TC_O_12_LIVE(db, live_claude, test_companies):
+    """Real Claude: Uber has ≥ 1 product with valid product_type/status/data_sensitivity."""
+    org = await onboard_test_org(db, "uber", test_companies)
+    products = (await db.execute(select(OrgProduct).where(OrgProduct.org_id == org.id))).scalars().all()
+    assert any(
+        getattr(p, "product_type", None) and getattr(p, "status", None) and getattr(p, "data_sensitivity", None)
+        for p in products
+    )
