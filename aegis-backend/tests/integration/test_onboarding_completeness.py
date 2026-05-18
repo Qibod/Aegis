@@ -19,6 +19,11 @@ from app.models import (
 )
 from tests.integration._helpers import onboard_test_org, get_seeding_attempts
 
+# All TC-O tests run the real seeder (onboard_test_org → _seed_org_background → Claude).
+# Mark the whole module so they are skipped in CI and only run in the nightly workflow
+# when LIVE_CLAUDE=1 and a real ANTHROPIC_API_KEY is present.
+pytestmark = pytest.mark.needs_live_claude
+
 
 REQUIRED_ORG_IDENTITY_FIELDS = [
     "legal_name", "trading_name", "year_founded", "employee_range",

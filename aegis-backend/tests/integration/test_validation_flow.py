@@ -16,6 +16,7 @@ from tests.integration._helpers import onboard_test_org
 
 
 # ── TC-V-01: Critical ─────────────────────────────────────────────────────────
+@pytest.mark.needs_live_claude
 @pytest.mark.asyncio
 async def test_TC_V_01_validator_a_runs_on_seeded_fields(db, mock_claude, test_companies):
     """After seeding, Validator A produces a FieldValidation row for each seeded field."""
@@ -29,6 +30,7 @@ async def test_TC_V_01_validator_a_runs_on_seeded_fields(db, mock_claude, test_c
 
 
 # ── TC-V-02: Critical ─────────────────────────────────────────────────────────
+@pytest.mark.needs_live_claude
 @pytest.mark.asyncio
 async def test_TC_V_02_validator_a_status_is_valid(db, mock_claude, test_companies):
     """Validator A status is one of {verified, disputed, unverifiable}."""
@@ -58,6 +60,7 @@ async def test_TC_V_04_validator_b_disagrees_yields_flagged_for_review(db, mock_
 
 
 # ── TC-V-05: High ─────────────────────────────────────────────────────────────
+@pytest.mark.needs_live_claude
 @pytest.mark.asyncio
 async def test_TC_V_05_uber_critical_fields_verified(db, mock_claude, test_companies):
     """For Uber, key fields end at verified or verified_after_dispute."""
@@ -70,6 +73,7 @@ async def test_TC_V_05_uber_critical_fields_verified(db, mock_claude, test_compa
 
 
 # ── TC-V-06: High ─────────────────────────────────────────────────────────────
+@pytest.mark.needs_live_claude
 @pytest.mark.asyncio
 async def test_TC_V_06_validation_within_120s(db, mock_claude, test_companies):
     """Validation completes within 120s of onboarding finishing (mocked Claude is instant)."""
@@ -79,6 +83,7 @@ async def test_TC_V_06_validation_within_120s(db, mock_claude, test_companies):
 
 
 # ── TC-V-07: Critical ─────────────────────────────────────────────────────────
+@pytest.mark.needs_live_claude
 @pytest.mark.asyncio
 async def test_TC_V_07_verified_fields_have_source_urls(db, mock_claude, test_companies):
     """Every Validator A row with status='verified' has ≥ 1 source URL."""
@@ -96,6 +101,7 @@ async def test_TC_V_07_verified_fields_have_source_urls(db, mock_claude, test_co
 
 
 # ── TC-V-08: Critical ─────────────────────────────────────────────────────────
+@pytest.mark.needs_live_claude
 @pytest.mark.asyncio
 async def test_TC_V_08_verified_field_locked_against_silent_reseed(db, mock_claude, test_companies):
     """A 'verified' field cannot be silently changed by a re-seed."""
